@@ -377,24 +377,6 @@ curl http://temt6000-sensor.local/sensor/temt6000_percentage
 curl http://temt6000-sensor.local/sensor/temt6000_lux
 ```
 
-### 4. UDP 广播测试
-
-使用 Python 脚本监听：
-
-```python
-import socket
-import json
-
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind(("0.0.0.0", 8888))
-
-print("等待 UDP 广播...")
-while True:
-    data, addr = sock.recvfrom(1024)
-    msg = json.loads(data.decode())
-    print(f"[{addr[0]}] 光照: {msg['percentage']:.1f}%, {msg['lux']:.1f} lx")
-```
-
 ---
 
 ## 常见问题
