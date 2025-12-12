@@ -1,16 +1,17 @@
-import requests
-import subprocess
-import time
-import threading
 import json
-from pathlib import Path
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-import pystray
-from pystray import MenuItem as item
-from PIL import Image, ImageDraw
-import sys
 import os
+import subprocess
+import sys
+import threading
+import time
+import tkinter as tk
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
+
+import pystray
+import requests
+from PIL import Image, ImageDraw
+from pystray import MenuItem as item
 
 # ================= 配置文件路径 =================
 CONFIG_FILE = Path.home() / "AutoDisplayLight_config.json"

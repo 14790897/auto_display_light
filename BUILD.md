@@ -2,11 +2,32 @@
 
 ## 快速打包
 
+### 本地打包
+
 直接运行打包脚本：
 
 ```powershell
 .\build.ps1
 ```
+
+### 自动化打包（GitHub Actions）
+
+项目已配置自动化构建流程：
+
+**触发方式：**
+1. **发布 Release** - 在 GitHub 创建新的 Release 时自动构建
+2. **手动触发** - 在 Actions 页面手动运行工作流
+   - 打开仓库 → Actions → "Build and Release AutoDisplayLight"
+   - 点击 "Run workflow"
+   - 输入版本标签（如 `v1.0.0`）
+
+**构建产物：**
+- `AutoDisplayLight.exe` - Windows 可执行文件
+- `AutoDisplayLight-v*.*.*.Windows.zip` - 完整发布包
+- `VERSION.txt` - 版本信息
+- `README.txt` - 使用说明
+
+所有构建产物会自动附加到 GitHub Release 中，也可在 Actions 页面下载 Artifacts。
 
 ## 手动打包步骤
 
