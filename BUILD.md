@@ -2,96 +2,79 @@
 
 ## 快速打包
 
-### 方法 1: 使用自动脚本（推荐）
-
 直接运行打包脚本：
 
 ```powershell
 .\build.ps1
 ```
 
-### 方法 2: 手动打包
+## 手动打包步骤
 
-#### 1. 安装依赖
+### 1. 安装依赖
 
 ```powershell
 pip install -r requirements.txt
 ```
 
-#### 2. 使用 PyInstaller 打包
+### 2. 使用 PyInstaller 打包
 
-**简单打包（单个 exe 文件）：**
 ```powershell
-pyinstaller --onefile --name AutoDisplayLight autolight.py
+pyinstaller autolight_tray.spec
 ```
 
-**使用配置文件打包：**
-```powershell
-pyinstaller autolight.spec
-```
-
-#### 3. 找到生成的 exe
+### 3. 找到生成的 exe
 
 打包完成后，exe 文件位于：
 - `dist\AutoDisplayLight.exe`
 
-## 打包参数说明
+## 功能特点
 
-- `--onefile`: 打包成单个 exe 文件
-- `--name`: 指定生成的 exe 名称
-- `--noconsole`: 无控制台窗口（适合后台运行，但会看不到日志）
-- `--console`: 保留控制台窗口（推荐，方便调试）
-- `--icon=icon.ico`: 指定图标文件
+✅ **系统托盘图标** - 程序运行在系统托盘，不占用任务栏空间  
+✅ **右键菜单控制** - 右键托盘图标即可控制所有功能  
+✅ **最小化到托盘** - 关闭窗口不退出程序，而是最小化到托盘  
+✅ **图形化设置界面** - 无需编辑代码，所有配置都可视化设置  
+✅ **配置自动保存** - 设置保存到用户目录，重启后自动加载  
+✅ **开机自启动** - 在设置界面一键启用/禁用开机自启动  
+✅ **传感器测试** - 一键测试传感器连接状态
 
 ## 使用打包后的程序
 
-1. 将 `dist\AutoDisplayLight.exe` 复制到任意位置
-2. 双击运行即可
-3. 按 `Ctrl+C` 停止程序
+1. 双击运行 `dist\AutoDisplayLight.exe`
+2. 程序会自动最小化到系统托盘（右下角）
+3. 右键托盘图标可进行以下操作：
+   - 显示主窗口 - 查看详细信息和状态
+   - 启动/停止服务 - 控制自动亮度调节
+   - 设置 - 打开配置界面
+   - 退出 - 完全关闭程序
 
-## 注意事项
+## 首次使用配置
 
-⚠️ **首次运行前请修改配置：**
-
-打包后的 exe 内嵌了代码，配置项在源代码的顶部：
-
-```python
-# 传感器地址
-SENSOR_URL = "http://temt6000-sensor.local/sensor/temt6000_percentage"
-
-# Twinkle Tray 的安装路径
-TT_PATH = r"C:\Users\13963\AppData\Local\Programs\twinkle-tray\Twinkle Tray.exe"
-
-# 刷新间隔 (秒)
-INTERVAL = 5
-
-# 屏幕亮度限制
-MIN_BRIGHTNESS = 10 
-MAX_BRIGHTNESS = 100
-
-# 灵敏度阈值
-THRESHOLD = 3
-```
-
-如需修改配置，请：
-1. 修改 `autolight.py` 中的配置
-2. 重新打包
+1. 右键托盘图标 → **设置**
+2. 配置以下信息：
+   - **传感器地址**：你的 ESPHome 传感器 URL
+   - **Twinkle Tray 路径**：浏览选择 Twinkle Tray.exe
+   - **刷新间隔**：多久检测一次环境亮度（推荐 5 秒）
+   - **亮度范围**：屏幕最小和最大亮度限制
+   - **灵敏度阈值**：亮度变化超过多少才调节（防止频繁闪烁）
+3. 点击 **测试连接** 确认传感器正常
+4. 点击 **保存**
 
 ## 设置开机自启动
 
-### 方法 1: 任务计划程序（推荐）
+在设置界面中：
+1. 滚动到"开机自启动"区域
+2. 点击 **启用开机自启动** 按钮
+3. 确认成功提示
+4. 下次登录时程序会自动启动
 
-1. 按 `Win + R`，输入 `taskschd.msc`
-2. 点击"创建基本任务"
-3. 触发器选择"登录时"
-4. 操作选择"启动程序"，浏览选择 `AutoDisplayLight.exe`
-5. 完成
+取消自启动：
+- 在设置中点击 **禁用开机自启动**
 
-### 方法 2: 启动文件夹
+## 配置文件位置
 
-1. 按 `Win + R`，输入 `shell:startup`
-2. 创建 `AutoDisplayLight.exe` 的快捷方式
-3. 将快捷方式放入打开的文件夹
+配置保存在：`%USERPROFILE%\AutoDisplayLight_config.json`
+
+示例路径：`C:\Users\你的用户名\AutoDisplayLight_config.json`
 
 ## 常见问题
 
@@ -99,26 +82,42 @@ THRESHOLD = 3
 A: PyInstaller 打包的程序可能被误报，添加到白名单即可。
 
 ### Q: 打包后文件太大？
-A: 单文件模式会包含 Python 运行时，大约 10-20MB 是正常的。
+A: 单文件模式会包含 Python 运行时和所有依赖库，大约 30-40MB 是正常的。
 
-### Q: 如何隐藏控制台窗口？
-A: 修改 `autolight.spec` 文件，将 `console=True` 改为 `console=False`，然后重新打包。
+### Q: 托盘图标不显示？
+A: 检查系统托盘设置，确保允许显示所有图标。Windows 11 在任务栏设置中可以配置。
 
-### Q: 如何添加图标？
+### Q: 如何完全卸载？
 A: 
-1. 准备一个 `.ico` 格式的图标文件
-2. 在打包命令中添加 `--icon=your_icon.ico`
-3. 或在 `autolight.spec` 中修改 `icon=None` 为 `icon='your_icon.ico'`
+1. 右键托盘图标 → 设置 → 禁用开机自启动
+2. 右键托盘图标 → 退出
+3. 删除 exe 文件
+4. 删除配置文件：`%USERPROFILE%\AutoDisplayLight_config.json`
+
+### Q: 如何查看任务计划？
+A: 
+1. 按 `Win + R`，输入 `taskschd.msc`
+2. 在任务列表中找到 `AutoDisplayLight`
 
 ## 文件结构
 
 ```
 auto_display_light/
-├── autolight.py          # 源代码
-├── autolight.spec        # PyInstaller 配置文件
+├── autolight_tray.py     # 源代码（托盘版）
+├── autolight_tray.spec   # PyInstaller 配置文件
 ├── requirements.txt      # Python 依赖
 ├── build.ps1            # 自动打包脚本
 ├── BUILD.md             # 本文档
 └── dist/                # 打包输出目录
-    └── AutoDisplayLight.exe
+    └── AutoDisplayLight.exe  # 最终的可执行文件
 ```
+
+## 技术说明
+
+- **GUI 框架**：Tkinter（Python 内置）
+- **托盘图标**：pystray
+- **图像处理**：Pillow
+- **HTTP 请求**：requests
+- **打包工具**：PyInstaller
+- **任务计划**：Windows Task Scheduler
+

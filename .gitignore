@@ -17,6 +17,12 @@ build/
 # dist/*
 # !dist/*.exe
 
+# 旧版本文件（已废弃）
+autolight.py
+autolight.spec
+autolight_gui.py
+autolight_gui.spec
+
 # Virtual Environment
 venv/
 env/

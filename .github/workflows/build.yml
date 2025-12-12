@@ -1,0 +1,148 @@
+name: PlatformIO CI
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # 允许手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Cache pip
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Cache PlatformIO
+      uses: actions/cache@v4
+      with:
+        path: ~/.platformio
+        key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}
+        restore-keys: |
+          ${{ runner.os }}-pio-
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install --upgrade platformio
+
+    - name: Show PlatformIO version
+      run: pio --version
+
+    - name: Build firmware
+      run: pio run
+
+    - name: Get build info
+      id: build_info
+      run: |
+        # 获取当前日期时间
+        echo "build_date=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
+        # 获取短 commit hash
+        echo "commit_hash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        # 获取分支名
+        echo "branch_name=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_OUTPUT
+
+    - name: Prepare artifacts
+      run: |
+        mkdir -p artifacts
+        # 复制固件文件
+        cp .pio/build/airm2m_core_esp32c3/firmware.bin artifacts/firmware.bin
+        cp .pio/build/airm2m_core_esp32c3/firmware.elf artifacts/firmware.elf
+        # 复制分区表和 bootloader
+        cp .pio/build/airm2m_core_esp32c3/partitions.bin artifacts/partitions.bin
+        cp .pio/build/airm2m_core_esp32c3/bootloader.bin artifacts/bootloader.bin
+        # 创建版本信息文件
+        cat > artifacts/build_info.txt << EOF
+        Build Date: $(date +'%Y-%m-%d %H:%M:%S')
+        Commit: ${{ steps.build_info.outputs.commit_hash }}
+        Branch: ${{ steps.build_info.outputs.branch_name }}
+        GitHub Run: ${{ github.run_number }}
+        EOF
+        # 创建烧录说明
+        cat > artifacts/FLASH_INSTRUCTIONS.txt << EOF
+        如何烧录固件到 ESP32-C3:
+
+        方法1: 使用 esptool.py (推荐)
+        ================================
+        pip install esptool
+
+        esptool.py --chip esp32c3 --port COM5 --baud 460800 \\
+          --before default_reset --after hard_reset write_flash \\
+          0x0 bootloader.bin \\
+          0x8000 partitions.bin \\
+          0x10000 firmware.bin
+
+        注意: 将 COM5 替换为你的实际串口
+
+        方法2: 使用 PlatformIO
+        ================================
+        pio run -t upload
+
+        固件信息:
+        ================================
+        固件版本: ${{ steps.build_info.outputs.commit_hash }}
+        构建日期: $(date +'%Y-%m-%d %H:%M:%S')
+        目标芯片: ESP32-C3 (AirM2M Core)
+        EOF
+
+    - name: Show build size
+      run: |
+        echo "=== Firmware Size ==="
+        ls -lh artifacts/*.bin
+        echo ""
+        echo "=== Memory Usage ==="
+        pio run --target size || true
+
+    - name: Upload firmware artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: beautiful-eyes-firmware-${{ steps.build_info.outputs.commit_hash }}
+        path: artifacts/
+        retention-days: 30
+
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          artifacts/firmware.bin
+          artifacts/firmware.elf
+          artifacts/bootloader.bin
+          artifacts/partitions.bin
+          artifacts/build_info.txt
+          artifacts/FLASH_INSTRUCTIONS.txt
+        body: |
+          ## Beautiful Eyes Firmware Release
+
+          **Build Info:**
+          - Commit: ${{ steps.build_info.outputs.commit_hash }}
+          - Date: ${{ steps.build_info.outputs.build_date }}
+
+          **Features:**
+          - 三种眼睛效果: 普通眼睛、魅魔眼睛、美丽女生眼睛
+          - 按 BOOT 按钮切换眼睛类型
+
+          **How to Flash:**
+          请参考下载的 FLASH_INSTRUCTIONS.txt 文件
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

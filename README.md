@@ -1,4 +1,226 @@
-# TEMT6000 光照传感器固件上传教程
+# 自动屏幕亮度调节工具
+
+[![Build and Release](https://github.com/14790897/auto_display_light/actions/workflows/build-release.yml/badge.svg)](https://github.com/14790897/auto_display_light/actions/workflows/build-release.yml)
+
+基于 ESPHome TEMT6000 光照传感器的 Windows 屏幕亮度自动调节工具。
+
+## ✨ 功能特点
+
+- 🌞 **自动亮度调节** - 根据环境光线自动调整屏幕亮度
+- 🎨 **系统托盘运行** - 最小化到系统托盘，不占用任务栏
+- ⚙️ **图形化配置** - 可视化设置界面，无需编辑代码
+- 🚀 **开机自启动** - 一键启用/禁用开机自启动
+- 💾 **配置持久化** - 设置自动保存，重启后保持
+- 🔌 **传感器测试** - 内置连接测试功能
+- 🎯 **防抖动机制** - 避免屏幕忽明忽暗
+
+## 📋 系统要求
+
+- Windows 10/11
+- [Twinkle Tray](https://github.com/xanderfrangos/twinkle-tray) (用于控制屏幕亮度)
+- ESPHome TEMT6000 光照传感器 (或兼容的传感器)
+
+## 🚀 快速开始
+
+### 下载使用（推荐）
+
+1. 从 [Releases](../../releases) 下载 `AutoDisplayLight.exe`
+2. 双击运行程序
+3. 在系统托盘找到太阳图标 ☀️
+4. 右键图标 → **设置** → 配置传感器和 Twinkle Tray
+5. 点击 **启动服务** 开始使用
+
+### 从源代码运行
+
+```powershell
+# 克隆仓库
+git clone https://github.com/14790897/auto_display_light.git
+cd auto_display_light
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 运行程序
+python autolight_tray.py
+```
+
+### 打包成 EXE
+
+```powershell
+# 安装依赖
+pip install -r requirements.txt
+
+# 打包
+.\build.ps1
+
+# 生成的文件在 dist\AutoDisplayLight.exe
+```
+
+## 📖 使用说明
+
+### 首次配置
+
+1. **右键托盘图标** → **设置**
+2. 配置以下参数：
+
+   **传感器设置**
+   - 传感器地址：`http://your-sensor.local/sensor/sensor_name`
+   
+   **Twinkle Tray 设置**
+   - 程序路径：点击"浏览"选择 `Twinkle Tray.exe`
+   
+   **运行参数**
+   - 刷新间隔：5 秒（推荐）
+   - 最小亮度：10% （防止屏幕过暗）
+   - 最大亮度：100%
+   - 灵敏度阈值：3% （亮度变化超过此值才调节）
+   
+   **界面选项**
+   - ✅ 启动时最小化到托盘
+   
+3. 点击 **测试连接** 确认传感器正常
+4. 点击 **保存**
+
+### 启用开机自启动
+
+在设置界面底部：
+1. 点击 **启用开机自启动**
+2. 确认成功提示
+3. 下次登录时程序将自动启动
+
+### 托盘菜单
+
+右键托盘图标可以：
+- **显示主窗口** - 查看详细信息和状态
+- **启动/停止服务** - 控制自动亮度调节
+- **设置** - 打开配置界面
+- **退出** - 完全关闭程序
+
+## 🔧 配置说明
+
+配置文件位置：`%USERPROFILE%\AutoDisplayLight_config.json`
+
+```json
+{
+  "sensor_url": "http://temt6000-sensor.local/sensor/temt6000_percentage",
+  "tt_path": "C:\\...\\Twinkle Tray.exe",
+  "interval": 5,
+  "min_brightness": 10,
+  "max_brightness": 100,
+  "threshold": 3,
+  "enabled": true,
+  "start_minimized": true
+}
+```
+
+## 🛠️ ESPHome 传感器配置
+
+TEMT6000 传感器配置示例：
+
+```yaml
+sensor:
+  - platform: adc
+    pin: GPIO0
+    name: "TEMT6000"
+    id: temt6000_percentage
+    update_interval: 5s
+    attenuation: 11db
+    filters:
+      - multiply: 100.0  # 转换为百分比
+```
+
+详细的 ESPHome 配置和固件上传教程请参考本仓库中的其他文档。
+
+## 🎯 工作原理
+
+```
+ESPHome 传感器
+  ↓ (HTTP JSON)
+获取环境亮度百分比
+  ↓
+应用最小/最大亮度限制
+  ↓
+判断变化是否超过阈值
+  ↓
+调用 Twinkle Tray 调节屏幕
+```
+
+## 🔍 常见问题
+
+### Q: 杀毒软件报毒？
+**A:** PyInstaller 打包的程序可能被误报，添加到白名单即可。
+
+### Q: 托盘图标不显示？
+**A:** 检查系统托盘设置，Windows 11 在任务栏设置中可以配置显示所有图标。
+
+### Q: 传感器连接失败？
+**A:** 
+1. 确认传感器 URL 正确
+2. 确认传感器在同一网络
+3. 在设置中点击"测试连接"诊断问题
+
+### Q: 屏幕亮度不变化？
+**A:**
+1. 确认 Twinkle Tray 路径正确
+2. 确认 Twinkle Tray 可以正常控制屏幕
+3. 检查最小/最大亮度设置
+4. 调低灵敏度阈值
+
+### Q: 如何完全卸载？
+**A:**
+1. 右键托盘图标 → 设置 → 禁用开机自启动
+2. 右键托盘图标 → 退出
+3. 删除程序文件
+4. 删除配置文件：`%USERPROFILE%\AutoDisplayLight_config.json`
+
+## 📦 项目结构
+
+```
+auto_display_light/
+├── autolight_tray.py      # 主程序源代码
+├── autolight_tray.spec    # PyInstaller 配置
+├── build.ps1              # 打包脚本
+├── requirements.txt       # Python 依赖
+├── BUILD.md              # 打包说明
+├── README.md             # 本文档
+└── dist/                 # 打包输出
+    └── AutoDisplayLight.exe
+```
+
+## 🛡️ 技术栈
+
+- **GUI 框架**: Tkinter
+- **系统托盘**: pystray
+- **图像处理**: Pillow
+- **HTTP 请求**: requests
+- **打包工具**: PyInstaller
+- **任务计划**: Windows Task Scheduler
+- **亮度控制**: Twinkle Tray
+
+## 📝 开发计划
+
+- [ ] 添加亮度曲线自定义功能
+- [ ] 支持多显示器独立控制
+- [ ] 添加日志记录功能
+- [ ] 支持更多传感器类型
+- [ ] 添加夜间模式
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## 📄 许可证
+
+MIT License
+
+## 🙏 致谢
+
+- [Twinkle Tray](https://github.com/xanderfrangos/twinkle-tray) - 屏幕亮度控制工具
+- [ESPHome](https://esphome.io/) - ESP 设备固件框架
+
+---
+
+⭐ 如果这个项目对你有帮助，请给个 Star！
 
 ## 固件文件位置
 
