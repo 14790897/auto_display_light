@@ -64,26 +64,31 @@ pip install -r requirements.txt
 2. 配置以下参数：
 
    **传感器设置**
+
    - 传感器地址：`http://your-sensor.local/sensor/sensor_name`
-   
+
    **Twinkle Tray 设置**
+
    - 程序路径：点击"浏览"选择 `Twinkle Tray.exe`
-   
+
    **运行参数**
+
    - 刷新间隔：5 秒（推荐）
    - 最小亮度：10% （防止屏幕过暗）
    - 最大亮度：100%
    - 灵敏度阈值：3% （亮度变化超过此值才调节）
-   
+
    **界面选项**
+
    - ✅ 启动时最小化到托盘
-   
+
 3. 点击 **测试连接** 确认传感器正常
 4. 点击 **保存**
 
 ### 启用开机自启动
 
 在设置界面底部：
+
 1. 点击 **启用开机自启动**
 2. 确认成功提示
 3. 下次登录时程序将自动启动
@@ -91,6 +96,7 @@ pip install -r requirements.txt
 ### 托盘菜单
 
 右键托盘图标可以：
+
 - **显示主窗口** - 查看详细信息和状态
 - **启动/停止服务** - 控制自动亮度调节
 - **设置** - 打开配置界面
@@ -126,7 +132,7 @@ sensor:
     update_interval: 5s
     attenuation: 11db
     filters:
-      - multiply: 100.0  # 转换为百分比
+      - multiply: 100.0 # 转换为百分比
 ```
 
 详细的 ESPHome 配置和固件上传教程请参考本仓库中的其他文档。
@@ -148,26 +154,34 @@ ESPHome 传感器
 ## 🔍 常见问题
 
 ### Q: 杀毒软件报毒？
+
 **A:** PyInstaller 打包的程序可能被误报，添加到白名单即可。
 
 ### Q: 托盘图标不显示？
+
 **A:** 检查系统托盘设置，Windows 11 在任务栏设置中可以配置显示所有图标。
 
 ### Q: 传感器连接失败？
-**A:** 
+
+**A:**
+
 1. 确认传感器 URL 正确
 2. 确认传感器在同一网络
 3. 在设置中点击"测试连接"诊断问题
 
 ### Q: 屏幕亮度不变化？
+
 **A:**
+
 1. 确认 Twinkle Tray 路径正确
 2. 确认 Twinkle Tray 可以正常控制屏幕
 3. 检查最小/最大亮度设置
 4. 调低灵敏度阈值
 
 ### Q: 如何完全卸载？
+
 **A:**
+
 1. 右键托盘图标 → 设置 → 禁用开机自启动
 2. 右键托盘图标 → 退出
 3. 删除程序文件
@@ -224,23 +238,22 @@ MIT License
 
 ## 固件文件位置
 
-
-
 ### 固件文件说明
 
-| 文件名 | 大小 | 用途 | 上传方式 |
-|--------|------|------|----------|
-| **firmware.factory.bin** | 1,198,816 字节 | ✅ **完整固件（推荐首次烧录）** | USB串口 |
-| firmware.bin | 1,133,280 字节 | 应用程序（OTA更新用） | OTA |
-| firmware.ota.bin | 1,133,280 字节 | OTA更新专用 | OTA |
-| bootloader.bin | 18,656 字节 | 引导程序 | 手动分区烧录 |
-| partitions.bin | 3,072 字节 | 分区表 | 手动分区烧录 |
+| 文件名                   | 大小           | 用途                            | 上传方式     |
+| ------------------------ | -------------- | ------------------------------- | ------------ |
+| **firmware.factory.bin** | 1,198,816 字节 | ✅ **完整固件（推荐首次烧录）** | USB 串口     |
+| firmware.bin             | 1,133,280 字节 | 应用程序（OTA 更新用）          | OTA          |
+| firmware.ota.bin         | 1,133,280 字节 | OTA 更新专用                    | OTA          |
+| bootloader.bin           | 18,656 字节    | 引导程序                        | 手动分区烧录 |
+| partitions.bin           | 3,072 字节     | 分区表                          | 手动分区烧录 |
 
 ---
 
-## 方法1：ESPHome 自动上传（最简单）
+## 方法 1：ESPHome 自动上传（最简单）
 
 ### 前提条件
+
 - ESP32-C3 通过 USB 连接到电脑
 - 已安装 ESPHome
 
@@ -255,6 +268,7 @@ esphome run .\configs\environmental-sensors\temt6000-esp32c3.yaml
 ```
 
 ESPHome 会自动：
+
 1. 编译固件
 2. 检测串口
 3. 上传固件
@@ -262,7 +276,7 @@ ESPHome 会自动：
 
 ---
 
-## 方法2：使用 esptool.py 手动烧录（推荐备份）
+## 方法 2：使用 esptool.py 手动烧录（推荐备份）
 
 ### 安装 esptool
 
@@ -287,6 +301,7 @@ esptool.py --chip esp32c3 --port COM3 --baud 460800 write_flash 0x0 "C:\git-prog
 ```
 
 **参数说明：**
+
 - `--chip esp32c3`：芯片型号
 - `--port COM3`：串口号（根据实际情况修改）
 - `--baud 460800`：波特率（可选：115200, 230400, 460800, 921600）
@@ -301,9 +316,10 @@ esptool.py --chip esp32c3 --port COM3 erase_flash
 
 ---
 
-## 方法3：使用 Flash Download Tool（图形界面）
+## 方法 3：使用 Flash Download Tool（图形界面）
 
 ### 下载工具
+
 https://www.espressif.com.cn/zh-hans/support/download/other-tools
 
 ### 烧录步骤
@@ -312,11 +328,12 @@ https://www.espressif.com.cn/zh-hans/support/download/other-tools
 2. **选择芯片类型**：ESP32-C3
 3. **配置烧录文件**：
 
-   | 文件路径 | 地址 | 勾选 |
-   |---------|------|-----|
-   | `firmware.factory.bin` | 0x0 | ✅ |
+   | 文件路径               | 地址 | 勾选 |
+   | ---------------------- | ---- | ---- |
+   | `firmware.factory.bin` | 0x0  | ✅   |
 
 4. **配置串口**：
+
    - COM Port: COM3（根据实际修改）
    - Baud: 460800
 
@@ -324,9 +341,10 @@ https://www.espressif.com.cn/zh-hans/support/download/other-tools
 
 ---
 
-## 方法4：OTA 无线更新（已烧录过固件）
+## 方法 4：OTA 无线更新（已烧录过固件）
 
 ### 前提条件
+
 - ESP32 已连接 WiFi
 - 已烧录过包含 OTA 功能的固件
 
@@ -354,6 +372,7 @@ esphome logs .\configs\environmental-sensors\temt6000-esp32c3.yaml
 ```
 
 应该看到：
+
 ```
 [I][temt6000:xxx]: Voltage: 1.234V, Percentage: 37.4%
 [I][udp:xxx]: Broadcast: {"device":"temt6000","percentage":37.4,"lux":520.3,"voltage":1.234}
@@ -362,11 +381,12 @@ esphome logs .\configs\environmental-sensors\temt6000-esp32c3.yaml
 ### 2. Web 界面
 
 浏览器访问：
-```
+
+```md
 http://temt6000-sensor.local
 ```
-![web interface](image.png)
 
+![web interface](image.png)
 
 ### 3. HTTP API 测试
 
@@ -385,14 +405,17 @@ curl http://temt6000-sensor.local/sensor/temt6000_lux
 ### 1. 找不到串口
 
 **原因**：
+
 - 未安装 USB 转 UART 驱动（CH340/CP2102）
 
 **解决**：
+
 - 下载驱动：https://www.wch.cn/downloads/CH341SER_EXE.html
 
 ### 2. 烧录失败："Failed to connect"
 
 **解决**：
+
 1. 按住 ESP32-C3 的 **BOOT 按钮**
 2. 点击 **RST 按钮** 复位
 3. 松开 RST，保持 BOOT 按住
@@ -402,16 +425,17 @@ curl http://temt6000-sensor.local/sensor/temt6000_lux
 ### 3. WiFi 连接失败
 
 **检查**：
+
 - `secrets.yaml` 中 `wifi_ssid` 和 `wifi_password` 是否正确
 - WiFi 是否为 2.4GHz（ESP32 不支持 5GHz）
 
 **备用方案**：
 设备会自动创建热点：
+
 - SSID: `TEMT6000-Sensor`
 - 密码: `12345678`
 
 连接后访问 `http://192.168.4.1` 配置 WiFi
-
 
 ## 硬件接线
 
@@ -439,10 +463,11 @@ ESP32-C3 GPIO3 ← TEMT6000 OUT (S)
 ### 修改 UDP 端口
 
 编辑 `temt6000-esp32c3.yaml`，修改：
+
 ```yaml
 udp:
   id: udp_broadcast
-  port: 9999  # 改为新端口
+  port: 9999 # 改为新端口
 ```
 
 然后重新编译上传。
@@ -450,16 +475,18 @@ udp:
 ### 调整广播频率
 
 传感器每秒更新一次，如需降低频率，修改：
+
 ```yaml
 sensor:
   - platform: template
     name: "TEMT6000 Percentage"
-    update_interval: 5s  # 改为 5 秒
+    update_interval: 5s # 改为 5 秒
 ```
 
 ### 添加 MQTT 支持
 
 如果需要 MQTT，在配置中添加：
+
 ```yaml
 mqtt:
   broker: 192.168.1.100
