@@ -365,6 +365,7 @@ esphome logs .\configs\environmental-sensors\temt6000-esp32c3.yaml
 ```
 http://temt6000-sensor.local
 ```
+![web interface](image.png)
 
 
 ### 3. HTTP API 测试
