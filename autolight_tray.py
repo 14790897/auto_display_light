@@ -21,9 +21,12 @@ DEFAULT_CONFIG = {
     "sensor_url": "http://temt6000-sensor.local/sensor/temt6000_percentage",
     "tt_path": r"C:\Users\13963\AppData\Local\Programs\twinkle-tray\Twinkle Tray.exe",
     "interval": 5,
-    "min_brightness": 10,
+    "min_brightness": 0,
     "max_brightness": 100,
     "threshold": 3,
+    "smooth_transition": True,
+    "transition_step": 2,
+    "transition_delay": 0.05,
     "enabled": True,
     "start_minimized": True
 }
@@ -164,23 +167,72 @@ class BrightnessController:
             return None
         return None
     
-    def set_screen_brightness(self, level):
+    def set_screen_brightness(self, level, smooth=None):
         """设置屏幕亮度"""
         safe_level = max(self.config['min_brightness'], 
                         min(self.config['max_brightness'], level))
         safe_level = int(safe_level)
         
-        cmd = [self.config['tt_path'], "--All", f"--Set={safe_level}"]
+        # 判断是否使用平滑过渡
+        use_smooth = smooth if smooth is not None else self.config.get('smooth_transition', True)
+        
+        if use_smooth and self.last_brightness >= 0:
+            # 平滑过渡
+            return self._smooth_transition(safe_level)
+        else:
+            # 直接设置
+            return self._set_brightness_direct(safe_level)
+    
+    def _set_brightness_direct(self, level):
+        """直接设置亮度（无过渡）"""
+        cmd = [self.config['tt_path'], "--All", f"--Set={level}"]
         
         try:
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            subprocess.run(cmd, startupinfo=startupinfo)
-            self.current_screen_value = safe_level
+            subprocess.run(cmd, startupinfo=startupinfo, timeout=2)
+            self.current_screen_value = level
             return True
         except FileNotFoundError:
             self.update_status("错误: 找不到 Twinkle Tray")
             return False
+        except Exception as e:
+            self.update_status(f"亮度设置错误: {str(e)[:30]}")
+            return False
+    
+    def _smooth_transition(self, target_level):
+        """平滑过渡到目标亮度"""
+        current = int(self.last_brightness)
+        step = self.config.get('transition_step', 2)
+        delay = self.config.get('transition_delay', 0.05)
+        
+        if current == target_level:
+            return True
+        
+        # 计算步进方向
+        direction = 1 if target_level > current else -1
+        
+        # 逐步调整
+        while abs(target_level - current) > 0:
+            if not self.running:  # 如果服务停止，中断过渡
+                break
+            
+            # 计算下一步的值
+            remaining = abs(target_level - current)
+            if remaining <= step:
+                current = target_level
+            else:
+                current += direction * step
+            
+            # 设置亮度
+            if not self._set_brightness_direct(current):
+                return False
+            
+            # 如果还没到目标值，短暂延迟
+            if current != target_level:
+                time.sleep(delay)
+        
+        return True
     
     def run_loop(self):
         """主循环"""
@@ -193,10 +245,12 @@ class BrightnessController:
                 if sensor_val is not None:
                     target_brightness = sensor_val
                     
-                    if abs(target_brightness - self.last_brightness) > self.config['threshold']:
+                    # 初次运行或超过阈值时调整
+                    if self.last_brightness < 0 or abs(target_brightness - self.last_brightness) > self.config['threshold']:
                         if self.set_screen_brightness(target_brightness):
                             self.last_brightness = target_brightness
-                            self.update_status(f"环境: {sensor_val:.1f}% → 屏幕: {int(target_brightness)}%")
+                            mode = "平滑" if self.config.get('smooth_transition', True) else "直接"
+                            self.update_status(f"环境: {sensor_val:.1f}% → 屏幕: {int(target_brightness)}% [{mode}]")
             
             time.sleep(self.config['interval'])
     
@@ -225,7 +279,7 @@ class SettingsWindow:
     def __init__(self, parent, config, on_save):
         self.window = tk.Toplevel(parent)
         self.window.title("自动亮度设置")
-        self.window.geometry("600x650")
+        self.window.geometry("600x750")
         self.window.resizable(False, False)
         
         self.config = config.copy()
@@ -295,6 +349,31 @@ class SettingsWindow:
         self.threshold_var = tk.IntVar(value=self.config['threshold'])
         ttk.Spinbox(params_frame, from_=1, to=20, textvariable=self.threshold_var, width=10).grid(row=3, column=1, sticky=tk.W, pady=5)
         ttk.Label(params_frame, text="(变化超过此值才调节)", font=('', 8)).grid(row=3, column=2, sticky=tk.W, padx=(5, 0))
+        
+        # 平滑过渡设置
+        smooth_frame = ttk.LabelFrame(main_frame, text="平滑过渡", padding="10")
+        smooth_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        self.smooth_transition_var = tk.BooleanVar(value=self.config.get('smooth_transition', True))
+        ttk.Checkbutton(smooth_frame, text="启用平滑过渡", variable=self.smooth_transition_var, 
+                       command=self.toggle_smooth_options).pack(anchor=tk.W, pady=(0, 5))
+        
+        smooth_params_frame = ttk.Frame(smooth_frame)
+        smooth_params_frame.pack(fill=tk.X, padx=(20, 0))
+        self.smooth_params_frame = smooth_params_frame
+        
+        ttk.Label(smooth_params_frame, text="过渡步长 (%):").grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.transition_step_var = tk.IntVar(value=self.config.get('transition_step', 2))
+        ttk.Spinbox(smooth_params_frame, from_=1, to=10, textvariable=self.transition_step_var, width=10).grid(row=0, column=1, sticky=tk.W, pady=5)
+        ttk.Label(smooth_params_frame, text="(每步调整的亮度)", font=('', 8)).grid(row=0, column=2, sticky=tk.W, padx=(5, 0))
+        
+        ttk.Label(smooth_params_frame, text="过渡延迟 (秒):").grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.transition_delay_var = tk.DoubleVar(value=self.config.get('transition_delay', 0.05))
+        ttk.Spinbox(smooth_params_frame, from_=0.01, to=0.5, increment=0.01, 
+                   textvariable=self.transition_delay_var, width=10, format="%.2f").grid(row=1, column=1, sticky=tk.W, pady=5)
+        ttk.Label(smooth_params_frame, text="(每步之间的间隔)", font=('', 8)).grid(row=1, column=2, sticky=tk.W, padx=(5, 0))
+        
+        self.toggle_smooth_options()
         
         # 界面选项
         ui_frame = ttk.LabelFrame(main_frame, text="界面选项", padding="10")
@@ -402,6 +481,13 @@ class SettingsWindow:
         else:
             messagebox.showerror("失败", "禁用开机自启动失败")
     
+    def toggle_smooth_options(self):
+        """切换平滑过渡选项的启用状态"""
+        state = tk.NORMAL if self.smooth_transition_var.get() else tk.DISABLED
+        for child in self.smooth_params_frame.winfo_children():
+            if isinstance(child, (ttk.Spinbox, ttk.Label)):
+                child.configure(state=state)
+    
     def save_settings(self):
         """保存设置"""
         self.config['sensor_url'] = self.sensor_url_var.get()
@@ -410,6 +496,9 @@ class SettingsWindow:
         self.config['min_brightness'] = self.min_brightness_var.get()
         self.config['max_brightness'] = self.max_brightness_var.get()
         self.config['threshold'] = self.threshold_var.get()
+        self.config['smooth_transition'] = self.smooth_transition_var.get()
+        self.config['transition_step'] = self.transition_step_var.get()
+        self.config['transition_delay'] = self.transition_delay_var.get()
         self.config['start_minimized'] = self.start_minimized_var.get()
         
         if self.on_save(self.config):
