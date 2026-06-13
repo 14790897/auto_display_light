@@ -1,4 +1,4 @@
-# Python
+# ============ Python ============
 __pycache__/
 *.py[cod]
 *$py.class
@@ -6,40 +6,75 @@ __pycache__/
 .Python
 *.egg-info/
 build/
+develop-eggs/
+dist/
 *.egg
+ MANIFEST
 
 # PyInstaller
 *.spec.bak
 *.manifest
 *.exe.log
 
-# dist 目录只忽略非 exe 文件
-# dist/*
-# !dist/*.exe
+# ============ 虚拟环境 ============
+venv/
+env/
+ENV/
+.venv
+.venv/
 
-# 旧版本文件（已废弃）
+# ============ ESPHome / 固件编译产物 ============
+# ESPHome 编译缓存（体积巨大，不需要版本管理）
+.esphome/
+
+# 固件二进制文件
+firmware.bin
+firmware.elf
+firmware.factory.bin
+firmware.ota.bin
+firmware.map
+bootloader.bin
+
+# 手动导出的固件目录（可选，如果希望追踪固件版本则注释掉）
+# firmware_output/
+
+# PlatformIO 缓存
+.pio/
+
+# ============ 敏感信息 ============
+# WiFi 密码、API 密钥等
+secrets.yaml
+
+# ============ 旧版本文件（已废弃） ============
 autolight.py
 autolight.spec
 autolight_gui.py
 autolight_gui.spec
 
-# Virtual Environment
-venv/
-env/
-ENV/
-.venv
-
-# IDE
+# ============ IDE ============
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.cursor/
 
-# OS
+# ============ OS ============
 .DS_Store
 Thumbs.db
 desktop.ini
+ehthumbs.db
 
-# Logs
+# ============ 日志 / 临时文件 ============
 *.log
+build_output.txt
+*.tmp
+*.bak
+
+# ============ 发行包 / 安装程序 ============
+*.exe
+*.msi
+*.dmg
+*.AppImage
+dist/**/*.exe
+!dist/.gitkeep

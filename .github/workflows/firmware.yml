@@ -1,0 +1,68 @@
+name: Build and Upload ESP32-C3 Firmware
+
+on:
+  push:
+    paths:
+      - 'esp32c3.yaml'
+      - '.github/workflows/firmware.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-firmware:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Cache PlatformIO packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.platformio
+        key: ${{ runner.os }}-platformio-${{ hashFiles('esp32c3.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-platformio-
+
+    - name: Install ESPHome
+      run: |
+        pip install --upgrade pip
+        pip install esphome
+      env:
+        PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
+        UV_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
+
+    - name: Compile firmware
+      run: |
+        esphome compile esp32c3.yaml
+      env:
+        PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
+        UV_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
+
+    - name: Copy firmware files
+      run: |
+        mkdir -p firmware_output
+        cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.factory.bin firmware_output/
+        cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.bin firmware_output/
+        cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.ota.bin firmware_output/
+        ls -lh firmware_output/
+
+    - name: Upload firmware to v1.0.0 Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v1.0.0
+        files: |
+          firmware_output/firmware.factory.bin
+          firmware_output/firmware.bin
+          firmware_output/firmware.ota.bin
+        file_glob: false
+        fail_on_unmatched_files: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
