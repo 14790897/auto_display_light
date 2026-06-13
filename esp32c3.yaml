@@ -21,6 +21,9 @@ wifi:
 # Home Assistant API
 api:
 
+# WiFi Portal (配网门户)
+captive_portal:
+
 # OTA更新
 ota:
   platform: esphome

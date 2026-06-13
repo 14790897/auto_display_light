@@ -121,21 +121,102 @@ pip install -r requirements.txt
 
 ## 🛠️ ESPHome 传感器配置
 
-TEMT6000 传感器配置示例：
+### esp32c3.yaml 文件说明
+
+仓库中包含完整的 ESPHome 配置文件 `esp32c3.yaml`，支持以下功能：
+
+- **TEMT6000 光照传感器** - 模拟信号读取（ADC）
+- **WiFi Portal** - 自动配网门户
+- **Web 服务器** - 内置网页监控
+- **HTTP API** - RESTful 接口供其他设备调用
+- **OTA 更新** - 无线固件升级
+- **UDP 广播** - 局域网实时数据推送（可选）
+
+### 配置文件位置
+
+```
+auto_display_light/
+└── esp32c3.yaml    # ESPHome 配置文件
+```
+
+### 主要配置项说明
+
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| `wifi.ssid` | WiFi 名称（从 secrets.yaml 读取） | - |
+| `wifi.password` | WiFi 密码（从 secrets.yaml 读取） | - |
+| `ap.ssid` | 备用热点名称 | `TEMT6000-Sensor` |
+| `ap.password` | 备用热点密码 | `12345678` |
+| `web_server.port` | Web 服务器端口 | `80` |
+| `sensor.update_interval` | 传感器更新间隔 | `1s` |
+
+### WiFi Portal 配网功能
+
+当设备无法连接配置的 WiFi 时，会自动创建配网热点：
+
+1. **连接热点**：SSID `TEMT6000-Sensor`，密码 `12345678`
+2. **打开浏览器**：访问 `http://192.168.4.1` 或任意网址
+3. **选择 WiFi**：在配网页面中选择并输入 WiFi 密码
+4. **保存配置**：设备重启后自动连接新 WiFi
+
+### 传感器接线
+
+```
+ESP32-C3 3.3V  → TEMT6000 VCC (V)
+ESP32-C3 GND   → TEMT6000 GND (G)
+ESP32-C3 GPIO3 ← TEMT6000 OUT (S)
+```
+
+### HTTP API 接口
+
+| 接口 | 方法 | 返回示例 |
+|------|------|----------|
+| `/sensor/temt6000_percentage` | GET | `{"value": 45.2}` |
+| `/sensor/temt6000_lux` | GET | `{"value": 650.3}` |
+| `/sensor/temt6000_voltage` | GET | `{"value": 1.492}` |
+| `/text_sensor/light_level` | GET | `{"value": "Moderate"}` |
+
+### 使用 secrets.yaml
+
+在 ESPHome 配置目录创建 `secrets.yaml`：
+
+```yaml
+wifi_ssid: "YOUR_WIFI_NAME"
+wifi_password: "YOUR_WIFI_PASSWORD"
+```
+
+### 编译与上传
+
+```powershell
+# 编译并上传到设备
+esphome run esp32c3.yaml
+
+# 仅编译固件
+esphome compile esp32c3.yaml
+
+# OTA 更新（设备已连网）
+esphome run esp32c3.yaml --device temt6000-sensor.local
+```
+
+### 完整配置示例
 
 ```yaml
 sensor:
   - platform: adc
-    pin: GPIO0
-    name: "TEMT6000"
-    id: temt6000_percentage
-    update_interval: 5s
-    attenuation: 11db
-    filters:
-      - multiply: 100.0 # 转换为百分比
-```
+    pin: GPIO3
+    name: "TEMT6000 Voltage"
+    id: temt6000_voltage
+    update_interval: 1s
+    attenuation: 12db
+    accuracy_decimals: 3
 
-详细的 ESPHome 配置和固件上传教程请参考本仓库中的其他文档。
+  - platform: template
+    name: "TEMT6000 Percentage"
+    id: temt6000_percentage
+    unit_of_measurement: "%"
+    lambda: |-
+      return (id(temt6000_voltage).state / 3.3) * 100.0;
+```
 
 ## 🎯 工作原理
 
