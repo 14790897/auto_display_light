@@ -1,205 +1,79 @@
-name: Build and Release AutoDisplayLight
+name: Build and Release Firmware
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Release tag (e.g., v1.0.0)'
-        required: true
-        type: string
+    paths:
+      - esp32c3.yaml
+      - secrets.yaml.example
 
 permissions:
   contents: write
 
 jobs:
   build-and-release:
-    runs-on: windows-latest
-
+    name: Build and Release Firmware
+    runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # 需要完整的提交历史用于 semantic-release
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
+      - name: Install ESPHome
+        run: |
+          pip install esphome --index-url https://mirrors.aliyun.com/pypi/simple/
+          esphome version
 
-    - name: Cache pip packages
-      uses: actions/cache@v4
-      with:
-        path: ~\AppData\Local\pip\Cache
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
+      - name: Create secrets.yaml
+        run: |
+          printf 'wifi_ssid: "AutoDisplayLight"\nwifi_password: "12345678"\n' > secrets.yaml
+          cat secrets.yaml
 
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Compile firmware
+        run: |
+          esphome compile esp32c3.yaml
+          mkdir -p firmware_output
+          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.factory.bin firmware_output/
+          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.bin firmware_output/
+          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.ota.bin firmware_output/
+          echo "=== Firmware files ==="
+          ls -lh firmware_output/
+        env:
+          PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
+          UV_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
 
-    - name: Install Node.js dependencies
-      run: npm ci
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(date +%Y%m%d-%H%M)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
 
-    - name: Build executable
-      run: |
-        Write-Host "Building AutoDisplayLight..." -ForegroundColor Cyan
-        pyinstaller autolight_tray.spec
-      shell: pwsh
-
-    - name: Get version info
-      id: version
-      run: |
-        $COMMIT = git rev-parse --short HEAD
-        $DATE = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        
-        echo "commit=$COMMIT" >> $env:GITHUB_OUTPUT
-        echo "date=$DATE" >> $env:GITHUB_OUTPUT
-      shell: pwsh
-
-    - name: Run semantic-release
-      id: semantic_release
-      if: github.event_name == 'push'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: npx semantic-release
-      continue-on-error: true
-
-    - name: Determine version for manual trigger
-      id: manual_version
-      if: github.event_name == 'workflow_dispatch'
-      run: |
-        echo "version=${{ github.event.inputs.tag }}" >> $env:GITHUB_OUTPUT
-      shell: pwsh
-
-    - name: Package release files
-      shell: pwsh
-      run: |
-        New-Item -ItemType Directory -Path release -Force
-        Copy-Item dist\\AutoDisplayLight.exe release\\
-        
-        # 获取版本号
-        $VERSION = "${{ steps.semantic_release.outputs.new_version }}"
-        if (-not $VERSION) {
-          $VERSION = "${{ github.event.inputs.tag }}"
-        }
-        if (-not $VERSION) {
-          $VERSION = "unknown"
-        }
-        
-        # Create VERSION.txt with multi-line content
-        $versionText = "AutoDisplayLight - 自动屏幕亮度调节工具`n"
-        $versionText += "=========================================`n"
-        $versionText += "Version: $VERSION`n"
-        $versionText += "Commit: ${{ steps.version.outputs.commit }}`n"
-        $versionText += "Build Date: ${{ steps.version.outputs.date }}`n"
-        $versionText += "Platform: Windows 10/11`n`n"
-        $versionText += "功能特点:`n"
-        $versionText += "- 基于环境光线自动调整屏幕亮度`n"
-        $versionText += "- 系统托盘运行`n"
-        $versionText += "- 图形化配置界面`n"
-        $versionText += "- 一键开机自启动`n"
-        $versionText += "- 配置持久化`n"
-        $versionText += "- 传感器连接测试`n"
-        $versionText += "- 防抖动机制`n`n"
-        $versionText += "- 智能查找 Twinkle Tray 路径`n`n"
-        $versionText += "系统要求:`n"
-        $versionText += "- Windows 10/11`n"
-        $versionText += "- Twinkle Tray (屏幕亮度控制工具)`n"
-        $versionText += "- Bonjour Service (mDNS 域名解析)`n"
-        $versionText += "- ESPHome TEMT6000 光照传感器`n"
-        Set-Content -Path release\\VERSION.txt -Encoding UTF8 -Value $versionText
-        
-        # Copy README as usage guide
-        Copy-Item README.md release\\README.txt
-        
-        # Compress to zip
-        Compress-Archive -Path "release\\*" -DestinationPath "AutoDisplayLight-$VERSION-Windows.zip"
-        
-        # 输出版本号供后续步骤使用
-        echo "version=$VERSION" >> $env:GITHUB_OUTPUT
-      id: package
-
-    - name: Upload to Release (semantic-release)
-      if: github.event_name == 'push' && steps.semantic_release.outputs.new_version
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: v${{ steps.semantic_release.outputs.new_version }}
-        name: AutoDisplayLight v${{ steps.semantic_release.outputs.new_version }}
-        files: |
-          AutoDisplayLight-${{ steps.package.outputs.version }}-Windows.zip
-          release/AutoDisplayLight.exe
-          release/VERSION.txt
-          release/README.txt
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Create Release (manual trigger)
-      if: github.event_name == 'workflow_dispatch'
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ github.event.inputs.tag }}
-        name: AutoDisplayLight ${{ github.event.inputs.tag }}
-        body: |
-          ## AutoDisplayLight ${{ github.event.inputs.tag }}
+      - name: Create Release and Upload firmware
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Creating release v$VERSION"
+          gh release create "v$VERSION" \
+            --repo ${{ github.repository }} \
+            --title "Firmware v$VERSION" \
+            --notes "## ESP32-C3 TEMT6000 固件
           
-          ### 📦 下载
-          - `AutoDisplayLight.exe` - Windows 可执行文件
-          - `AutoDisplayLight-${{ github.event.inputs.tag }}-Windows.zip` - 完整包 (包含使用说明)
+          **编译时间:** $(date)
           
-          ### ✨ 功能特点
-          - 🌞 基于环境光线自动调整屏幕亮度
-          - 🎨 系统托盘运行
-          - ⚙️ 图形化配置界面
-          - 🚀 一键开机自启动
-          - 💾 配置持久化
-          - 🔍 智能查找 Twinkle Tray 路径
-          
-          ### 📋 系统要求
-          - Windows 10/11
-          - [Twinkle Tray](https://github.com/xanderfrangos/twinkle-tray)
-          - Bonjour Service (用于 mDNS 域名解析)
-          - ESPHome TEMT6000 光照传感器
-          
-          ### 🚀 快速开始
-          1. 下载 `AutoDisplayLight.exe`
-          2. 双击运行
-          3. 右键托盘图标 → 设置 → 配置传感器和 Twinkle Tray
-          4. 启动服务
-          
-          详细使用说明请查看压缩包内的 README.txt
-          
-          ---
-          
-          **构建信息**
-          - 版本: ${{ github.event.inputs.tag }}
-          - 提交: ${{ steps.version.outputs.commit }}
-          - 日期: ${{ steps.version.outputs.date }}
-        files: |
-          AutoDisplayLight-${{ steps.package.outputs.version }}-Windows.zip
-          release/AutoDisplayLight.exe
-          release/VERSION.txt
-          release/README.txt
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: AutoDisplayLight-${{ steps.package.outputs.version }}
-        path: |
-          release/
-          AutoDisplayLight-${{ steps.package.outputs.version }}-Windows.zip
-        retention-days: 30
+          ### 固件文件
+          - \`firmware.factory.bin\` - 首次烧录（含 bootloader）
+          - \`firmware.bin\` - 单独固件
+          - \`firmware.ota.bin\` - OTA 升级" \
+            firmware_output/firmware.factory.bin \
+            firmware_output/firmware.bin \
+            firmware_output/firmware.ota.bin
+          echo "✅ Release created: https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
