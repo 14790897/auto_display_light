@@ -21,6 +21,34 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ESPHome
+        run: |
+          pip install esphome --index-url https://mirrors.aliyun.com/pypi/simple/
+
+      - name: Create secrets.yaml
+        run: |
+          echo "wifi_ssid: \"${WIFI_SSID}\"" > secrets.yaml
+          echo "wifi_password: \"${WIFI_PASSWORD}\"" >> secrets.yaml
+        env:
+          WIFI_SSID: ${{ secrets.WIFI_SSID }}
+          WIFI_PASSWORD: ${{ secrets.WIFI_PASSWORD }}
+
+      - name: Compile firmware
+        run: |
+          mkdir -p firmware_output
+          esphome compile esp32c3.yaml
+          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.factory.bin firmware_output/
+          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.bin firmware_output/
+          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.ota.bin firmware_output/
+        env:
+          PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
+          UV_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
