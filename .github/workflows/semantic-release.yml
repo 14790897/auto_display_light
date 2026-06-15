@@ -65,21 +65,23 @@ jobs:
           npx semantic-release
           echo "=== Fetching tags ==="
           git fetch --tags
-          TAG=$(git describe --tags --abbrev=0)
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "TAG=$TAG"
           echo "TAG=$TAG" >> $GITHUB_OUTPUT
-          echo "Created tag: $TAG"
+
+      - name: Debug - Print variables
+        run: |
+          echo "TAG from semantic step: ${{ steps.semantic.outputs.TAG }}"
+          echo "Firmware files:"
+          ls -lh firmware_output/ || echo "firmware_output/ is empty"
 
       - name: Upload firmware to release
-        if: steps.semantic.outcome == 'success'
+        if: steps.semantic.outputs.TAG != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.semantic.outputs.TAG }}"
-          if [ -z "$TAG" ]; then
-            echo "No tag found, trying to get latest release"
-            TAG=$(gh release list --repo ${{ github.repository }} --limit 1 | awk '{print $3}')
-          fi
-          echo "Uploading firmware to release $TAG"
+          echo "Uploading firmware to release: $TAG"
           ls -lh firmware_output/
           gh release upload "$TAG" firmware_output/firmware.factory.bin --clobber
           gh release upload "$TAG" firmware_output/firmware.bin --clobber
