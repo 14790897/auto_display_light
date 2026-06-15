@@ -5,6 +5,7 @@ import sys
 import threading
 import time
 import tkinter as tk
+import winreg
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
@@ -16,10 +17,88 @@ from pystray import MenuItem as item
 # ================= 配置文件路径 =================
 CONFIG_FILE = Path.home() / "AutoDisplayLight_config.json"
 
+# ================= 智能查找 Twinkle Tray =================
+def find_twinkle_tray():
+    """智能查找 Twinkle Tray 安装路径"""
+    possible_paths = [
+        # 默认安装路径（当前用户）
+        Path.home() / "AppData" / "Local" / "Programs" / "twinkle-tray" / "Twinkle Tray.exe",
+        # 常见安装路径
+        Path(r"C:\Program Files\twinkle-tray\Twinkle Tray.exe"),
+        Path(r"C:\Program Files (x86)\twinkle-tray\Twinkle Tray.exe"),
+        # 另一个常见位置
+        Path(os.environ.get('LOCALAPPDATA', '')) / "Programs" / "twinkle-tray" / "Twinkle Tray.exe",
+    ]
+    
+    # 检查注册表（通过安装程序注册的路径）
+    try:
+        # 检查 HKCU 下的安装路径
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall") as key:
+            for i in range(winreg.QueryInfoKey(key)[0]):
+                try:
+                    subkey_name = winreg.EnumKey(key, i)
+                    with winreg.OpenKey(key, subkey_name) as subkey:
+                        try:
+                            display_name = winreg.QueryValueEx(subkey, "DisplayName")[0]
+                            if "Twinkle Tray" in display_name:
+                                install_path = winreg.QueryValueEx(subkey, "InstallLocation")[0]
+                                if install_path:
+                                    path = Path(install_path) / "Twinkle Tray.exe"
+                                    if path.exists():
+                                        return str(path)
+                        except FileNotFoundError:
+                            continue
+                except OSError:
+                    continue
+    except Exception:
+        pass
+    
+    # 检查文件系统中的可能路径
+    for path in possible_paths:
+        if path.exists():
+            return str(path)
+    
+    # 通过 winget 查找安装位置
+    try:
+        result = subprocess.run(
+            ['winget', 'show', '--id=XanderFrangos.TwinkleTray', '--accept-source-agreements'],
+            capture_output=True,
+            text=True,
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+        if result.returncode == 0:
+            for line in result.stdout.split('\n'):
+                if 'Installed Location' in line:
+                    parts = line.split(':', 1)
+                    if len(parts) > 1:
+                        install_dir = parts[1].strip()
+                        path = Path(install_dir) / "Twinkle Tray.exe"
+                        if path.exists():
+                            return str(path)
+    except Exception:
+        pass
+    
+    # 通过任务列表查找正在运行的实例
+    try:
+        result = subprocess.run(
+            ['powershell', '-Command', 'Get-Process "Twinkle Tray" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path'],
+            capture_output=True,
+            text=True,
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except Exception:
+        pass
+    
+    # 返回默认路径（如果找到的话）
+    default_path = Path.home() / "AppData" / "Local" / "Programs" / "twinkle-tray" / "Twinkle Tray.exe"
+    return str(default_path)
+
 # ================= 默认配置 =================
 DEFAULT_CONFIG = {
     "sensor_url": "http://temt6000-sensor.local/sensor/temt6000_percentage",
-    "tt_path": r"C:\Users\13963\AppData\Local\Programs\twinkle-tray\Twinkle Tray.exe",
+    "tt_path": find_twinkle_tray(),
     "interval": 5,
     "min_brightness": 0,
     "max_brightness": 100,
