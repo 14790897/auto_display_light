@@ -1,3 +1,10 @@
+## [1.1.5](https://github.com/14790897/auto_display_light/compare/v1.1.4...v1.1.5) (2026-06-15)
+
+
+### Bug Fixes
+
+* **ci:** 简化工作流为单个 job ([193fbdb](https://github.com/14790897/auto_display_light/commit/193fbdb2539402529a57c0ffd74cb166323c9dbb))
+
 ## [1.1.4](https://github.com/14790897/auto_display_light/compare/v1.1.3...v1.1.4) (2026-06-15)
 
 
