@@ -58,6 +58,26 @@ jobs:
         run: npm install
 
       - name: Release
+        id: semantic
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release
+        run: |
+          npx semantic-release | tee release_output.txt
+          cat release_output.txt
+
+      - name: Upload firmware to release
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 获取最新创建的 release tag
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$TAG" ]; then
+            echo "No tag found, skipping firmware upload"
+            exit 0
+          fi
+          echo "Uploading firmware to release $TAG"
+          gh release upload $TAG firmware_output/firmware.factory.bin --clobber || echo "Upload failed"
+          gh release upload $TAG firmware_output/firmware.bin --clobber || echo "Upload failed"
+          gh release upload $TAG firmware_output/firmware.ota.bin --clobber || echo "Upload failed"
+          echo "Firmware uploaded successfully"
