@@ -3,16 +3,17 @@ from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
 
 block_cipher = None
 
-# 强制收集 tkinter data 和 DLL（CI 环境可能缺少 Tcl/Tk）
+# 强制收集 tkinter Tcl/Tk DLL（CI 环境 Windows Server 可能缺少 GUI 库）
 tk_datas = collect_data_files('tkinter')
 tk_bins = collect_dynamic_libs('tkinter')
 
 a = Analysis(
-    ['autolight.py'],
+    ['autolight_tray.py'],
     pathex=[],
     binaries=tk_bins,
     datas=tk_datas,
-    hiddenimports=['requests', 'tkinter', '_tkinter'],
+    hiddenimports=['requests', 'tkinter', '_tkinter', 'pystray', 'PIL', 'PIL.Image', 'PIL.ImageDraw',
+                   'six', 'pkg_resources', 'jaraco', 'jaraco.classes', 'more_itertools', 'winreg'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
