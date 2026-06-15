@@ -1,3 +1,10 @@
+## [1.1.8](https://github.com/14790897/auto_display_light/compare/v1.1.7...v1.1.8) (2026-06-15)
+
+
+### Bug Fixes
+
+* **ci:** 添加调试步骤，打印 TAG 和固件文件 ([46fede0](https://github.com/14790897/auto_display_light/commit/46fede082a33b1cb27ae01e25aae524860d4eb7a))
+
 ## [1.1.7](https://github.com/14790897/auto_display_light/compare/v1.1.6...v1.1.7) (2026-06-15)
 
 
