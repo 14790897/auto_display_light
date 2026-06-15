@@ -1,13 +1,18 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
 
 block_cipher = None
+
+# 强制收集 tkinter data 和 DLL（CI 环境可能缺少 Tcl/Tk）
+tk_datas = collect_data_files('tkinter')
+tk_bins = collect_dynamic_libs('tkinter')
 
 a = Analysis(
     ['autolight.py'],
     pathex=[],
-    binaries=[],
-    datas=[],
-    hiddenimports=['requests', 'tkinter', 'json', 'os', 'subprocess', 'time'],
+    binaries=tk_bins,
+    datas=tk_datas,
+    hiddenimports=['requests', 'tkinter', '_tkinter'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
