@@ -62,22 +62,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npx semantic-release | tee release_output.txt
-          cat release_output.txt
+          npx semantic-release
+          echo "=== Fetching tags ==="
+          git fetch --tags
+          TAG=$(git describe --tags --abbrev=0)
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT
+          echo "Created tag: $TAG"
 
       - name: Upload firmware to release
-        if: success()
+        if: steps.semantic.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 获取最新创建的 release tag
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          TAG="${{ steps.semantic.outputs.TAG }}"
           if [ -z "$TAG" ]; then
-            echo "No tag found, skipping firmware upload"
-            exit 0
+            echo "No tag found, trying to get latest release"
+            TAG=$(gh release list --repo ${{ github.repository }} --limit 1 | awk '{print $3}')
           fi
           echo "Uploading firmware to release $TAG"
-          gh release upload $TAG firmware_output/firmware.factory.bin --clobber || echo "Upload failed"
-          gh release upload $TAG firmware_output/firmware.bin --clobber || echo "Upload failed"
-          gh release upload $TAG firmware_output/firmware.ota.bin --clobber || echo "Upload failed"
-          echo "Firmware uploaded successfully"
+          ls -lh firmware_output/
+          gh release upload "$TAG" firmware_output/firmware.factory.bin --clobber
+          gh release upload "$TAG" firmware_output/firmware.bin --clobber
+          gh release upload "$TAG" firmware_output/firmware.ota.bin --clobber
+          echo "✅ Firmware uploaded successfully"
