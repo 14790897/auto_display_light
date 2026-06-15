@@ -1,3 +1,10 @@
+## [1.1.7](https://github.com/14790897/auto_display_light/compare/v1.1.6...v1.1.7) (2026-06-15)
+
+
+### Bug Fixes
+
+* **ci:** 修复固件上传步骤的 tag 获取问题 ([abc875c](https://github.com/14790897/auto_display_light/commit/abc875c083514eb6632e72d3cda6c06b2ef6e257))
+
 ## [1.1.6](https://github.com/14790897/auto_display_light/compare/v1.1.5...v1.1.6) (2026-06-15)
 
 
