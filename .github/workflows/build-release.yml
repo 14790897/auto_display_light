@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - esp32c3.yaml
-      - secrets.yaml.example
 
 permissions:
   contents: write
