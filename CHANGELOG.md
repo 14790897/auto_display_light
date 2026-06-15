@@ -1,3 +1,10 @@
+## [1.1.4](https://github.com/14790897/auto_display_light/compare/v1.1.3...v1.1.4) (2026-06-15)
+
+
+### Bug Fixes
+
+* **ci:** 使用 artifacts 传递固件文件到 release 步骤 ([ed0f0c0](https://github.com/14790897/auto_display_light/commit/ed0f0c0112538a0b8f94659c1243f2f8c52861b9))
+
 ## [1.1.3](https://github.com/14790897/auto_display_light/compare/v1.1.2...v1.1.3) (2026-06-15)
 
 
