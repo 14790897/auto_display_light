@@ -1,0 +1,200 @@
+name: Build and Release All
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+
+permissions:
+  contents: write
+
+jobs:
+  # Job 1: 编译 ESP32 固件 (Ubuntu)
+  build-firmware:
+    name: Build Firmware
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ESPHome
+        run: |
+          pip install esphome --index-url https://mirrors.aliyun.com/pypi/simple/
+          esphome version
+
+      - name: Create secrets.yaml
+        run: |
+          printf 'wifi_ssid: "AutoDisplayLight"\nwifi_password: "12345678"\n' > secrets.yaml
+          cat secrets.yaml
+
+      - name: Compile firmware
+        run: |
+          esphome compile esp32c3.yaml
+          mkdir -p firmware_output
+          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.factory.bin firmware_output/ || true
+          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.bin firmware_output/ || true
+          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.ota.bin firmware_output/ || true
+          echo "=== Firmware files ==="
+          ls -lh firmware_output/ || echo "No firmware files generated"
+        env:
+          PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
+          UV_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: firmware_output/
+          retention-days: 1
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(date +%Y%m%d-%H%M)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+  # Job 2: 编译 Windows exe (Windows)
+  build-exe:
+    name: Build Windows Exe
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pystray pillow requests
+          pip install -r requirements.txt || echo "No requirements.txt or install failed"
+
+      - name: Build exe with PyInstaller
+        run: |
+          pyinstaller autolight.spec
+          if (Test-Path "dist/AutoDisplayLight.exe") { echo "✅ Exe built successfully" } else { echo "❌ Exe build failed"; dir dist/ }
+
+      - name: Upload exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: exe
+          path: dist/AutoDisplayLight.exe
+          retention-days: 1
+
+      - name: Get version
+        id: version
+        run: |
+          $VERSION = Get-Date -Format "yyyyMMdd-HHmm"
+          echo "version=$VERSION" >> $env:GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+  # Job 3: 创建 Release 并上传所有文件
+  release:
+    name: Create Release
+    needs: [build-firmware, build-exe]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download firmware artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware
+          path: ./artifacts/firmware/
+
+      - name: Download exe artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: exe
+          path: ./artifacts/exe/
+
+      - name: List artifacts
+        run: |
+          echo "=== Artifacts ==="
+          ls -lhR ./artifacts/ || echo "No artifacts found"
+
+      - name: Get version
+        id: version
+        run: |
+          # 优先使用 firmware job 的 version，否则用当前时间
+          VERSION="${{ needs.build-firmware.outputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION=$(date +%Y%m%d-%H%M)
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Create Release and Upload all files
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Creating release v$VERSION"
+          
+          # 收集所有文件
+          FILES=""
+          if [ -f "./artifacts/firmware/firmware.factory.bin" ]; then FILES="$FILES ./artifacts/firmware/firmware.factory.bin"; fi
+          if [ -f "./artifacts/firmware/firmware.bin" ]; then FILES="$FILES ./artifacts/firmware/firmware.bin"; fi
+          if [ -f "./artifacts/firmware/firmware.ota.bin" ]; then FILES="$FILES ./artifacts/firmware/firmware.ota.bin"; fi
+          if [ -f "./artifacts/exe/AutoDisplayLight.exe" ]; then FILES="$FILES ./artifacts/exe/AutoDisplayLight.exe"; fi
+          
+          echo "Files to upload: $FILES"
+          
+          gh release create "v$VERSION" \
+            --repo ${{ github.repository }} \
+            --title "AutoDisplayLight v$VERSION" \
+            --notes "## AutoDisplayLight v$VERSION
+
+**编译时间:** $(date)
+
+### 📦 下载
+
+| 文件 | 说明 |
+|------|------|
+| \`AutoDisplayLight.exe\` | Windows 客户端（双击运行） |
+| \`firmware.factory.bin\` | ESP32-C3 首次烧录（含 bootloader） |
+| \`firmware.bin\` | ESP32-C3 固件（单独） |
+| \`firmware.ota.bin\` | ESP32-C3 OTA 升级固件 |
+
+### ✨ 功能
+
+**PC 端:**
+- 🌞 根据环境光线自动调整屏幕亮度
+- 🎨 系统托盘运行
+- ⚙️ 图形化配置界面
+- 🚀 开机自启动
+
+**固件:**
+- 📡 WiFi 连接
+- 🌐 光照强度检测（lux / 百分比）
+- 🔄 OTA 无线升级
+- 🌐 Web 界面配置
+
+### 📋 使用方法
+
+1. 下载 \`AutoDisplayLight.exe\` 并运行
+2. 下载 \`firmware.factory.bin\` 烧录到 ESP32-C3
+3. 配置 WiFi 和 Twinkle Tray 路径
+4. 启动服务" \
+            $FILES
+
+          echo "✅ Release created: https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
