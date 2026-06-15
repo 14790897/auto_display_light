@@ -78,3 +78,4 @@ build_output.txt
 *.AppImage
 dist/**/*.exe
 !dist/.gitkeep
+node_modules/
