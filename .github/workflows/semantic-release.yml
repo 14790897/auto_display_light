@@ -29,23 +29,35 @@ jobs:
       - name: Install ESPHome
         run: |
           pip install esphome --index-url https://mirrors.aliyun.com/pypi/simple/
+          esphome version
 
       - name: Create secrets.yaml
         run: |
-          echo "wifi_ssid: \"AutoDisplayLight\"" > secrets.yaml
-          echo "wifi_password: \"12345678\"" >> secrets.yaml
+          cat > secrets.yaml << 'EOF'
+          wifi_ssid: "AutoDisplayLight"
+          wifi_password: "12345678"
+          EOF
+          cat secrets.yaml
 
       - name: Compile firmware
         run: |
           mkdir -p firmware_output
-          esphome compile esp32c3.yaml
-          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.factory.bin firmware_output/ || true
-          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.bin firmware_output/ || true
-          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.ota.bin firmware_output/ || true
-          ls -lh firmware_output/
+          esphome compile esp32c3.yaml 2>&1 | tee compile.log
+          echo "=== Compile log ==="
+          cat compile.log
+          echo "=== Firmware files ==="
+          ls -lh .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/*.bin || echo "No firmware files found"
         env:
           PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
           UV_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
+
+      - name: Copy firmware
+        run: |
+          mkdir -p firmware_output
+          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.factory.bin firmware_output/ || echo "Warning: firmware.factory.bin not found"
+          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.bin firmware_output/ || echo "Warning: firmware.bin not found"
+          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.ota.bin firmware_output/ || echo "Warning: firmware.ota.bin not found"
+          ls -lh firmware_output/ || echo "firmware_output is empty"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
