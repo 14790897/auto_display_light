@@ -1,3 +1,10 @@
+## [1.1.3](https://github.com/14790897/auto_display_light/compare/v1.1.2...v1.1.3) (2026-06-15)
+
+
+### Bug Fixes
+
+* **ci:** 修复 semantic-release 工作流编译步骤 ([a3d58c8](https://github.com/14790897/auto_display_light/commit/a3d58c8b93daf8032843442b249d2243d75a79b3))
+
 ## [1.1.2](https://github.com/14790897/auto_display_light/compare/v1.1.1...v1.1.2) (2026-06-15)
 
 
