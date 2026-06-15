@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/14790897/auto_display_light/compare/v1.1.1...v1.1.2) (2026-06-15)
+
+
+### Bug Fixes
+
+* **ci:** 直接在 workflow 中写入默认 WiFi 凭证 ([fae3407](https://github.com/14790897/auto_display_light/commit/fae3407f9ff558e9fb07507870d0560ad04d9eea))
+
 ## [1.1.1](https://github.com/14790897/auto_display_light/compare/v1.1.0...v1.1.1) (2026-06-15)
 
 
