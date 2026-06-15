@@ -1,6 +1,6 @@
 # 自动屏幕亮度调节工具
 
-[![Build and Release](https://github.com/14790897/auto_display_light/actions/workflows/build-release.yml/badge.svg)](https://github.com/14790897/auto_display_light/actions/workflows/build-release.yml)
+[![Build and Release](https://github.com/14790897/auto_display_light/actions/workflows/build-all.yml/badge.svg)](https://github.com/14790897/auto_display_light/actions/workflows/build-all.yml)
 
 基于 ESPHome TEMT6000 光照传感器的 Windows 屏幕亮度自动调节工具。
 
@@ -56,7 +56,7 @@ cd auto_display_light
 pip install -r requirements.txt
 
 # 运行程序
-python autolight_tray.py
+python autolight.py
 ```
 
 ### 打包成 EXE
@@ -161,7 +161,7 @@ auto_display_light/
 | `wifi.ssid` | WiFi 名称（从 secrets.yaml 读取） | - |
 | `wifi.password` | WiFi 密码（从 secrets.yaml 读取） | - |
 | `ap.ssid` | 备用热点名称 | `TEMT6000-Sensor` |
-| `ap.password` | 备用热点密码 | `12345678` |
+| `ap.password` | 备用热点密码 | `12345678ABCD` |
 | `web_server.port` | Web 服务器端口 | `80` |
 | `sensor.update_interval` | 传感器更新间隔 | `1s` |
 
@@ -169,7 +169,7 @@ auto_display_light/
 
 当设备无法连接配置的 WiFi 时，会自动创建配网热点：
 
-1. **连接热点**：SSID `TEMT6000-Sensor`，密码 `12345678`
+1. **连接热点**：SSID `TEMT6000-Sensor`，密码 `12345678ABCD`
 2. **打开浏览器**：访问 `http://192.168.4.1` 或任意网址
 3. **选择 WiFi**：在配网页面中选择并输入 WiFi 密码
 4. **保存配置**：设备重启后自动连接新 WiFi
@@ -287,13 +287,13 @@ ESPHome 传感器
 
 ```
 auto_display_light/
-├── autolight_tray.py      # 主程序源代码
-├── autolight_tray.spec    # PyInstaller 配置
+├── autolight.py           # 主程序源代码
+├── autolight.spec         # PyInstaller 配置
+├── esp32c3.yaml           # ESPHome 固件配置
 ├── build.ps1              # 打包脚本
 ├── requirements.txt       # Python 依赖
-├── BUILD.md              # 打包说明
-├── README.md             # 本文档
-└── dist/                 # 打包输出
+├── README.md              # 本文档
+└── dist/                  # 打包输出
     └── AutoDisplayLight.exe
 ```
 
@@ -338,11 +338,9 @@ MIT License
 
 | 文件名                   | 大小           | 用途                            | 上传方式     |
 | ------------------------ | -------------- | ------------------------------- | ------------ |
-| **firmware.factory.bin** | 1,198,816 字节 | ✅ **完整固件（推荐首次烧录）** | USB 串口     |
-| firmware.bin             | 1,133,280 字节 | 应用程序（OTA 更新用）          | OTA          |
-| firmware.ota.bin         | 1,133,280 字节 | OTA 更新专用                    | OTA          |
-| bootloader.bin           | 18,656 字节    | 引导程序                        | 手动分区烧录 |
-| partitions.bin           | 3,072 字节     | 分区表                          | 手动分区烧录 |
+| **firmware.factory.bin** | ~981 KB        | ✅ **完整固件（推荐首次烧录）** | USB 串口     |
+| firmware.bin             | ~916 KB        | 应用程序                        | OTA          |
+| firmware.ota.bin         | ~916 KB        | OTA 更新专用                    | OTA          |
 
 ---
 
@@ -357,10 +355,10 @@ MIT License
 
 ```powershell
 # 在项目根目录执行
-cd C:\git-program\Embedded\MY-ESPHOME
+cd auto_display_light
 
 # 自动编译并上传
-esphome run .\configs\environmental-sensors\temt6000-esp32c3.yaml
+esphome run esp32c3.yaml
 ```
 
 ESPHome 会自动：
@@ -393,7 +391,7 @@ mode
 ### 烧录完整固件（首次使用）
 
 ```powershell
-esptool.py --chip esp32c3 --port COM3 --baud 460800 write_flash 0x0 "C:\git-program\Embedded\MY-ESPHOME\configs\environmental-sensors\.esphome\build\temt6000-sensor\.pioenvs\temt6000-sensor\firmware.factory.bin"
+esptool.py --chip esp32c3 --port COM3 --baud 460800 write_flash 0x0 "firmware_output/firmware.factory.bin"
 ```
 
 **参数说明：**
@@ -448,7 +446,7 @@ https://www.espressif.com.cn/zh-hans/support/download/other-tools
 
 ```powershell
 # 通过 WiFi 更新（设备名：temt6000-sensor）
-esphome run .\configs\environmental-sensors\temt6000-esp32c3.yaml --device temt6000-sensor.local
+esphome run esp32c3.yaml --device temt6000-sensor.local
 ```
 
 或者在 ESPHome Dashboard 中点击 "UPLOAD" → "Wirelessly"
@@ -461,7 +459,7 @@ esphome run .\configs\environmental-sensors\temt6000-esp32c3.yaml --device temt6
 
 ```powershell
 # ESPHome 日志
-esphome logs .\configs\environmental-sensors\temt6000-esp32c3.yaml
+esphome logs esp32c3.yaml
 
 # 或使用 Arduino Serial Monitor / PuTTY / minicom
 # 波特率：115200
@@ -529,7 +527,7 @@ curl http://temt6000-sensor.local/sensor/temt6000_lux
 设备会自动创建热点：
 
 - SSID: `TEMT6000-Sensor`
-- 密码: `12345678`
+- 密码: `12345678ABCD`
 
 连接后访问 `http://192.168.4.1` 配置 WiFi
 
@@ -546,11 +544,8 @@ ESP32-C3 GPIO3 ← TEMT6000 OUT (S)
 ## 固件版本信息
 
 - **设备名称**：temt6000-sensor
-- **芯片型号**：ESP32-C3 (AirM2M CORE)
-- **Flash 使用**：61.1% (1,120,528 / 1,835,008 字节)
-- **RAM 使用**：11.3% (36,920 / 327,680 字节)
-- **编译日期**：2025-12-11 17:43:16
-- **ESPHome 版本**：2025.9.1
+- **芯片型号**：ESP32-C3
+- **固件文件**：从 Releases 页面下载或通过 CI 自动构建
 
 ---
 
@@ -558,7 +553,7 @@ ESP32-C3 GPIO3 ← TEMT6000 OUT (S)
 
 ### 修改 UDP 端口
 
-编辑 `temt6000-esp32c3.yaml`，修改：
+编辑 `esp32c3.yaml`，修改：
 
 ```yaml
 udp:
