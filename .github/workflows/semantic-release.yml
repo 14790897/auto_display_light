@@ -11,15 +11,16 @@ permissions:
   pull-requests: write
 
 jobs:
-  release:
-    name: Release
+  build-firmware:
+    name: Build Firmware
     runs-on: ubuntu-latest
+    outputs:
+      firmware-built: ${{ steps.compile.outcome }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -33,31 +34,51 @@ jobs:
 
       - name: Create secrets.yaml
         run: |
-          cat > secrets.yaml << 'EOF'
-          wifi_ssid: "AutoDisplayLight"
-          wifi_password: "12345678"
-          EOF
+          printf 'wifi_ssid: "AutoDisplayLight"\nwifi_password: "12345678"\n' > secrets.yaml
           cat secrets.yaml
 
       - name: Compile firmware
+        id: compile
         run: |
-          mkdir -p firmware_output
-          esphome compile esp32c3.yaml 2>&1 | tee compile.log
-          echo "=== Compile log ==="
-          cat compile.log
-          echo "=== Firmware files ==="
-          ls -lh .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/*.bin || echo "No firmware files found"
+          esphome compile esp32c3.yaml 2>&1
+          echo "=== Checking firmware files ==="
+          ls -lh .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/*.bin || (echo "ERROR: Firmware files not found!" && exit 1)
         env:
           PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
           UV_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
 
-      - name: Copy firmware
+      - name: Upload firmware artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.factory.bin
+            .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.bin
+            .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.ota.bin
+          retention-days: 1
+
+  release:
+    name: Release
+    needs: build-firmware
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download firmware artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware
+          path: firmware_output/
+
+      - name: Check firmware files
         run: |
-          mkdir -p firmware_output
-          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.factory.bin firmware_output/ || echo "Warning: firmware.factory.bin not found"
-          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.bin firmware_output/ || echo "Warning: firmware.bin not found"
-          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.ota.bin firmware_output/ || echo "Warning: firmware.ota.bin not found"
-          ls -lh firmware_output/ || echo "firmware_output is empty"
+          ls -lh firmware_output/
+          test -f firmware_output/firmware.factory.bin || (echo "ERROR: firmware.factory.bin not found!" && exit 1)
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
