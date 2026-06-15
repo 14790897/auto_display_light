@@ -16,7 +16,7 @@ wifi:
   # 创建WiFi热点作为备用
   ap:
     ssid: "TEMT6000-Sensor"
-    password: "12345678"
+    password: "12345678ABCD"
 
 # Home Assistant API
 api:

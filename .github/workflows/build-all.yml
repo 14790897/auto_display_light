@@ -26,8 +26,9 @@ jobs:
 
       - name: Create secrets.yaml
         run: |
-          echo 'wifi_ssid: "test"' > secrets.yaml
-          echo 'wifi_password: "test"' >> secrets.yaml
+          echo 'wifi_ssid: "AutoDisplayLight"' > secrets.yaml
+          echo 'wifi_password: "12345678ABCD"' >> secrets.yaml
+          cat secrets.yaml
 
       - name: Compile firmware
         run: esphome compile esp32c3.yaml
