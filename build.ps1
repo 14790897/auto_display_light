@@ -63,7 +63,7 @@ Write-Host "开始打包..." -ForegroundColor Yellow
 Write-Host ""
 
 # 使用 spec 文件打包
-pyinstaller autolight_tray.spec
+pyinstaller autolight.spec
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""
