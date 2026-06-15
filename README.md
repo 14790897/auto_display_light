@@ -18,7 +18,22 @@
 
 - Windows 10/11
 - [Twinkle Tray](https://github.com/xanderfrangos/twinkle-tray) (用于控制屏幕亮度)
+- **Bonjour Service** (用于 mDNS 域名解析，如 `temt6000-sensor.local`)
 - ESPHome TEMT6000 光照传感器 (或兼容的传感器)
+
+### 安装 Bonjour Service
+
+Windows 默认不支持 mDNS，需要安装 Apple Bonjour：
+
+```powershell
+# 使用 winget 安装（推荐）
+winget install --id=Apple.Bonjour -e
+
+# 或从 Apple 官网下载安装
+# https://support.apple.com/kb/DL999
+```
+
+安装后重启电脑，即可使用 `http://temt6000-sensor.local` 访问传感器。
 
 ## 🚀 快速开始
 
