@@ -11,16 +11,15 @@ permissions:
   pull-requests: write
 
 jobs:
-  build-firmware:
-    name: Build Firmware
+  release:
+    name: Release
     runs-on: ubuntu-latest
-    outputs:
-      firmware-built: ${{ steps.compile.outcome }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -38,47 +37,17 @@ jobs:
           cat secrets.yaml
 
       - name: Compile firmware
-        id: compile
         run: |
-          esphome compile esp32c3.yaml 2>&1
-          echo "=== Checking firmware files ==="
-          ls -lh .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/*.bin || (echo "ERROR: Firmware files not found!" && exit 1)
+          esphome compile esp32c3.yaml
+          mkdir -p firmware_output
+          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.factory.bin firmware_output/ || (echo "ERROR: firmware.factory.bin not found" && exit 1)
+          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.bin firmware_output/ || (echo "ERROR: firmware.bin not found" && exit 1)
+          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.ota.bin firmware_output/ || (echo "ERROR: firmware.ota.bin not found" && exit 1)
+          echo "=== Firmware files ==="
+          ls -lh firmware_output/
         env:
           PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
           UV_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
-
-      - name: Upload firmware artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: firmware
-          path: |
-            .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.factory.bin
-            .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.bin
-            .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.ota.bin
-          retention-days: 1
-
-  release:
-    name: Release
-    needs: build-firmware
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Download firmware artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: firmware
-          path: firmware_output/
-
-      - name: Check firmware files
-        run: |
-          ls -lh firmware_output/
-          test -f firmware_output/firmware.factory.bin || (echo "ERROR: firmware.factory.bin not found!" && exit 1)
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
