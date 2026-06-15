@@ -1,3 +1,10 @@
+## [1.1.6](https://github.com/14790897/auto_display_light/compare/v1.1.5...v1.1.6) (2026-06-15)
+
+
+### Bug Fixes
+
+* **ci:** 添加固件文件上传步骤 ([7562b81](https://github.com/14790897/auto_display_light/commit/7562b81557c507c9db8df5007ebd399b2989e60d))
+
 ## [1.1.5](https://github.com/14790897/auto_display_light/compare/v1.1.4...v1.1.5) (2026-06-15)
 
 
