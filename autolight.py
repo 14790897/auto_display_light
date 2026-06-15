@@ -5,6 +5,22 @@ import os
 import json
 import tkinter as tk
 from tkinter import filedialog
+import traceback
+import sys
+
+# ── 日志文件（闪退时在这里看报错）─────────────────
+LOG_FILE = os.path.join(os.path.expanduser("~"), "AutoDisplayLight_error.log")
+
+def log(msg):
+    """写日志到文件（方便排查闪退问题）"""
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
+    except Exception:
+        pass
+    print(msg)
+
+# ── 配置区域 ────────────────────────────────────────────
 
 CONFIG_FILE = os.path.join(os.path.expanduser("~"), "AutoDisplayLight_config.json")
 
@@ -22,8 +38,8 @@ def load_config():
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-    except Exception:
-        pass
+    except Exception as e:
+        log(f"加载配置失败: {e}")
     return dict(DEFAULT_CONFIG)
 
 def save_config(config):
@@ -31,16 +47,24 @@ def save_config(config):
         json.dump(config, f, indent=2, ensure_ascii=False)
 
 def find_twinkle_tray():
+    """自动查找 Twinkle Tray 安装路径（用 os.environ，避免 expandvars 问题）"""
+    # 获取环境变量（Windows 兼容）
+    local_appdata = os.environ.get("LOCALAPPDATA", "")
+    program_files = os.environ.get("PROGRAMFILES", r"C:\Program Files")
+    program_files_x86 = os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")
+
     candidates = [
-        os.path.expandvars(r"%LOCALAPPDATA%\Programs\twinkle-tray\Twinkle Tray.exe"),
-        os.path.expandvars(r"%PROGRAMFILES%\Twinkle Tray\Twinkle Tray.exe"),
-        os.path.expandvars(r"%PROGRAMFILES(X86)%\Twinkle Tray\Twinkle Tray.exe"),
+        os.path.join(local_appdata, r"Programs\twinkle-tray\Twinkle Tray.exe"),
+        os.path.join(program_files, r"Twinkle Tray\Twinkle Tray.exe"),
+        os.path.join(program_files_x86, r"Twinkle Tray\Twinkle Tray.exe"),
         r"C:\Program Files\Twinkle Tray\Twinkle Tray.exe",
         r"C:\Program Files (x86)\Twinkle Tray\Twinkle Tray.exe",
     ]
     for path in candidates:
         if path and os.path.exists(path):
+            log(f"自动找到 Twinkle Tray: {path}")
             return path
+    log("未找到 Twinkle Tray，请手动配置路径")
     return ""
 
 # ── 传感器读取 ─────────────────────────────────────────────
@@ -52,10 +76,10 @@ def get_sensor_value(sensor_url):
         data = resp.json()
         if "value" in data:
             val = float(data["value"])
-            print(f"当前环境亮度: {val:.2f}%")
+            log(f"当前环境亮度: {val:.2f}%")
             return val
     except Exception as e:
-        print(f"获取传感器数据失败: {e}")
+        log(f"获取传感器数据失败: {e}")
     return None
 
 # ── 亮度调节 ───────────────────────────────────────────────
@@ -63,21 +87,21 @@ def get_sensor_value(sensor_url):
 def set_brightness(level, config):
     tt = config["tt_path"]
     if not tt or not os.path.exists(tt):
-        print(f"错误: 找不到 Twinkle Tray: {tt}")
+        log(f"错误: 找不到 Twinkle Tray: {tt}")
         return
     safe = max(config["min_brightness"], min(config["max_brightness"], int(level)))
     try:
         si = subprocess.STARTUPINFO()
         si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         subprocess.run([tt, "--All", f"--Set={safe}"], startupinfo=si)
-        print(f"→ 屏幕亮度已设为 {safe}%")
+        log(f"→ 屏幕亮度已设为 {safe}%")
     except Exception as e:
-        print(f"调节亮度失败: {e}")
+        log(f"调节亮度失败: {e}")
 
 # ── 主循环 ─────────────────────────────────────────────────
 
 def main_loop(config):
-    print("--- AutoDisplayLight 运行中 (Ctrl+C 停止) ---")
+    log("--- AutoDisplayLight 运行中 ---")
     last = -999
     while True:
         val = get_sensor_value(config["sensor_url"])
@@ -103,16 +127,10 @@ class ConfigWindow:
         cf = self.config
         row = 0
 
-        def add_row(label, var_key, width=45):
-            nonlocal row
-            tk.Label(self.root, text=label).grid(row=row, column=0, sticky="w", padx=10, pady=5)
-            var = tk.StringVar(value=str(cf.get(var_key, "")))
-            setattr(self, f"{var_key}_var", var)
-            tk.Entry(self.root, textvariable=var, width=width).grid(row=row, column=1, padx=10, pady=5, columnspan=2, sticky="w")
-            row += 1
-
-        add_row("传感器 URL:", "sensor_url")
-        row -= 1
+        tk.Label(self.root, text="传感器 URL:").grid(row=row, column=0, sticky="w", padx=10, pady=5)
+        self.sensor_url_var = tk.StringVar(value=cf.get("sensor_url", ""))
+        tk.Entry(self.root, textvariable=self.sensor_url_var, width=45).grid(row=row, column=1, padx=10, pady=5, columnspan=2, sticky="w")
+        row += 1
 
         tk.Label(self.root, text="Twinkle Tray 路径:").grid(row=row, column=0, sticky="w", padx=10, pady=5)
         self.tt_path_var = tk.StringVar(value=cf.get("tt_path", ""))
@@ -160,9 +178,10 @@ class ConfigWindow:
         self.root.quit()
         self.root.destroy()
 
-# ── 入口 ───────────────────────────────────────────────────
+# ── 入口（带全局异常捕获）─────────────────────────────
 
 def main():
+    log(f"=== AutoDisplayLight 启动 {time.strftime('%Y-%m-%d %H:%M:%S')} ===")
     config = load_config()
 
     # 自动查找 Twinkle Tray
@@ -172,7 +191,7 @@ def main():
             config["tt_path"] = found
             save_config(config)
 
-    # 配置不完整 → 弹窗
+    # 判断是否需要弹配置窗
     need_config = (
         not config.get("tt_path") or
         not os.path.exists(config["tt_path"]) or
@@ -180,15 +199,25 @@ def main():
     )
 
     if need_config:
-        print("首次运行，请填写配置...")
+        log("配置不完整，弹出配置窗口...")
         win = ConfigWindow(config)
         result = win.result
         if not result:
-            print("未保存配置，退出。")
+            log("未保存配置，退出。")
             return
         config = result
 
     main_loop(config)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        log("程序异常退出:")
+        log(traceback.format_exc())
+        # 弹窗提示用户查看日志
+        try:
+            import tkinter.messagebox as mb
+            mb.showerror("程序异常退出", f"请查看日志文件:\n{LOG_FILE}")
+        except Exception:
+            pass
