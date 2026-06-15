@@ -1,8 +1,9 @@
 name: Build and Release AutoDisplayLight
 
 on:
-  release:
-    types: [created]
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       tag:
@@ -20,11 +21,19 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 需要完整的提交历史用于 semantic-release
 
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
 
     - name: Cache pip packages
       uses: actions/cache@v4
@@ -34,10 +43,13 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
 
-    - name: Install dependencies
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+
+    - name: Install Node.js dependencies
+      run: npm ci
 
     - name: Build executable
       run: |
@@ -48,17 +60,26 @@ jobs:
     - name: Get version info
       id: version
       run: |
-        if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-          $VERSION = "${{ github.event.inputs.tag }}"
-        } else {
-          $VERSION = "${{ github.event.release.tag_name }}"
-        }
         $COMMIT = git rev-parse --short HEAD
         $DATE = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
         
-        echo "version=$VERSION" >> $env:GITHUB_OUTPUT
         echo "commit=$COMMIT" >> $env:GITHUB_OUTPUT
         echo "date=$DATE" >> $env:GITHUB_OUTPUT
+      shell: pwsh
+
+    - name: Run semantic-release
+      id: semantic_release
+      if: github.event_name == 'push'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: npx semantic-release
+      continue-on-error: true
+
+    - name: Determine version for manual trigger
+      id: manual_version
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        echo "version=${{ github.event.inputs.tag }}" >> $env:GITHUB_OUTPUT
       shell: pwsh
 
     - name: Package release files
@@ -67,10 +88,19 @@ jobs:
         New-Item -ItemType Directory -Path release -Force
         Copy-Item dist\\AutoDisplayLight.exe release\\
         
+        # 获取版本号
+        $VERSION = "${{ steps.semantic_release.outputs.new_version }}"
+        if (-not $VERSION) {
+          $VERSION = "${{ github.event.inputs.tag }}"
+        }
+        if (-not $VERSION) {
+          $VERSION = "unknown"
+        }
+        
         # Create VERSION.txt with multi-line content
         $versionText = "AutoDisplayLight - 自动屏幕亮度调节工具`n"
         $versionText += "=========================================`n"
-        $versionText += "Version: ${{ steps.version.outputs.version }}`n"
+        $versionText += "Version: $VERSION`n"
         $versionText += "Commit: ${{ steps.version.outputs.commit }}`n"
         $versionText += "Build Date: ${{ steps.version.outputs.date }}`n"
         $versionText += "Platform: Windows 10/11`n`n"
@@ -82,9 +112,11 @@ jobs:
         $versionText += "- 配置持久化`n"
         $versionText += "- 传感器连接测试`n"
         $versionText += "- 防抖动机制`n`n"
+        $versionText += "- 智能查找 Twinkle Tray 路径`n`n"
         $versionText += "系统要求:`n"
         $versionText += "- Windows 10/11`n"
         $versionText += "- Twinkle Tray (屏幕亮度控制工具)`n"
+        $versionText += "- Bonjour Service (mDNS 域名解析)`n"
         $versionText += "- ESPHome TEMT6000 光照传感器`n"
         Set-Content -Path release\\VERSION.txt -Encoding UTF8 -Value $versionText
         
@@ -92,14 +124,20 @@ jobs:
         Copy-Item README.md release\\README.txt
         
         # Compress to zip
-        Compress-Archive -Path "release\\*" -DestinationPath "AutoDisplayLight-${{ steps.version.outputs.version }}-Windows.zip"
+        Compress-Archive -Path "release\\*" -DestinationPath "AutoDisplayLight-$VERSION-Windows.zip"
+        
+        # 输出版本号供后续步骤使用
+        echo "version=$VERSION" >> $env:GITHUB_OUTPUT
+      id: package
 
-    - name: Upload to Release
-      if: github.event_name == 'release'
+    - name: Upload to Release (semantic-release)
+      if: github.event_name == 'push' && steps.semantic_release.outputs.new_version
       uses: softprops/action-gh-release@v1
       with:
+        tag_name: v${{ steps.semantic_release.outputs.new_version }}
+        name: AutoDisplayLight v${{ steps.semantic_release.outputs.new_version }}
         files: |
-          AutoDisplayLight-${{ steps.version.outputs.version }}-Windows.zip
+          AutoDisplayLight-${{ steps.package.outputs.version }}-Windows.zip
           release/AutoDisplayLight.exe
           release/VERSION.txt
           release/README.txt
@@ -125,10 +163,12 @@ jobs:
           - ⚙️ 图形化配置界面
           - 🚀 一键开机自启动
           - 💾 配置持久化
+          - 🔍 智能查找 Twinkle Tray 路径
           
           ### 📋 系统要求
           - Windows 10/11
           - [Twinkle Tray](https://github.com/xanderfrangos/twinkle-tray)
+          - Bonjour Service (用于 mDNS 域名解析)
           - ESPHome TEMT6000 光照传感器
           
           ### 🚀 快速开始
@@ -142,11 +182,11 @@ jobs:
           ---
           
           **构建信息**
-          - 版本: ${{ steps.version.outputs.version }}
+          - 版本: ${{ github.event.inputs.tag }}
           - 提交: ${{ steps.version.outputs.commit }}
           - 日期: ${{ steps.version.outputs.date }}
         files: |
-          AutoDisplayLight-${{ github.event.inputs.tag }}-Windows.zip
+          AutoDisplayLight-${{ steps.package.outputs.version }}-Windows.zip
           release/AutoDisplayLight.exe
           release/VERSION.txt
           release/README.txt
@@ -158,8 +198,8 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: AutoDisplayLight-${{ steps.version.outputs.version }}
+        name: AutoDisplayLight-${{ steps.package.outputs.version }}
         path: |
           release/
-          AutoDisplayLight-${{ steps.version.outputs.version }}-Windows.zip
+          AutoDisplayLight-${{ steps.package.outputs.version }}-Windows.zip
         retention-days: 30
