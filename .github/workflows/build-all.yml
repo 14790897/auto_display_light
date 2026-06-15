@@ -6,7 +6,6 @@ on:
       - main
     paths-ignore:
       - '**.md'
-      - '.gitignore'
 
 permissions:
   contents: write
@@ -23,29 +22,22 @@ jobs:
           python-version: '3.12'
 
       - name: Install ESPHome
-        run: pip install esphome --index-url https://mirrors.aliyun.com/pypi/simple/
+        run: pip install esphome
 
       - name: Create secrets.yaml
         run: |
-          echo 'wifi_ssid: "AutoDisplayLight"' > secrets.yaml
-          echo 'wifi_password: "12345678"' >> secrets.yaml
+          echo 'wifi_ssid: "test"' > secrets.yaml
+          echo 'wifi_password: "test"' >> secrets.yaml
 
       - name: Compile firmware
-        run: |
-          esphome compile esp32c3.yaml
-          mkdir -p output
-          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.factory.bin output/ || true
-          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.bin output/ || true
-          cp .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware.ota.bin output/ || true
-          ls -lh output/ || echo "No firmware files"
+        run: esphome compile esp32c3.yaml
         env:
           PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
-          UV_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
 
       - uses: actions/upload-artifact@v4
         with:
           name: firmware
-          path: output/
+          path: .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware*.bin
 
   build-exe:
     name: Build Exe
@@ -69,7 +61,7 @@ jobs:
           path: dist/AutoDisplayLight.exe
 
   release:
-    name: Create Release
+    name: Release
     needs: [build-firmware, build-exe]
     runs-on: ubuntu-latest
     steps:
@@ -77,16 +69,10 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: firmware
-          path: artifacts/firmware/
+          path: artifacts
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: exe
-          path: artifacts/exe/
-
-      - name: List artifacts
-        run: ls -lhR artifacts/
+      - name: List files
+        run: find artifacts/ -type f
 
       - name: Create Release
         env:
@@ -94,25 +80,8 @@ jobs:
         run: |
           VERSION=$(date +%Y%m%d-%H%M)
           echo "Version: $VERSION"
-
-          FILES=""
-          [ -f artifacts/firmware/firmware.factory.bin ] && FILES="$FILES artifacts/firmware/firmware.factory.bin"
-          [ -f artifacts/firmware/firmware.bin ] && FILES="$FILES artifacts/firmware/firmware.bin"
-          [ -f artifacts/firmware/firmware.ota.bin ] && FILES="$FILES artifacts/firmware/firmware.ota.bin"
-          [ -f artifacts/exe/AutoDisplayLight.exe ] && FILES="$FILES artifacts/exe/AutoDisplayLight.exe"
-
-          echo "Files: $FILES"
-
           gh release create "v$VERSION" \
             --repo ${{ github.repository }} \
             --title "AutoDisplayLight v$VERSION" \
-            --notes "## AutoDisplayLight v$VERSION
-
-### 下载
-- \`AutoDisplayLight.exe\` — Windows 客户端
-- \`firmware.factory.bin\` — ESP32-C3 首次烧录
-- \`firmware.bin\` / \`firmware.ota.bin\` — OTA 升级
-
-### 功能
-PC 端自动调光 + ESP32-C3 光照传感器固件" \
-            $FILES
+            --notes "AutoDisplayLight Release $VERSION" \
+            artifacts/firmware/* artifacts/exe/*
