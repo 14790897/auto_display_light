@@ -97,7 +97,7 @@ def find_twinkle_tray():
 
 # ================= 默认配置 =================
 DEFAULT_CONFIG = {
-    "sensor_url": "http://temt6000-sensor.local/sensor/temt6000_percentage",
+    "sensor_url": "http://temt6000-sensor.local/sensor/TEMT6000%20Percentage",
     "tt_path": find_twinkle_tray(),
     "interval": 5,
     "min_brightness": 0,
