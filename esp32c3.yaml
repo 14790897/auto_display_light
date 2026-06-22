@@ -2,6 +2,16 @@ esphome:
   name: temt6000-sensor
   platformio_options:
     monitor_speed: 115200
+  on_boot:
+    priority: -100
+    then:
+      # GPIO12/13 是板载指示灯，启动时关闭以省电
+      - lambda: |-
+          pinMode(12, OUTPUT);
+          pinMode(13, OUTPUT);
+          digitalWrite(12, LOW);
+          digitalWrite(13, LOW);
+          ESP_LOGI("boot", "GPIO12 and GPIO13 set to LOW");
 
 esp32:
   board: airm2m_core_esp32c3
