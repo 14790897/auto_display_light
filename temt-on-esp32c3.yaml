@@ -107,11 +107,11 @@ sensor:
     lambda: |-
       float voltage = id(temt6000_voltage).state;
 
-      // TEMT6000 特性: 光越强，电压越高（线性）
-      // 暗光: ~0V -> 0%
-      // 室内: ~1.5V -> 45%
-      // 明亮: ~3.3V -> 100%
-      float pct = (voltage / 3.3) * 100.0;
+      // TEMT6000 共射极电路: 光越强，集电极电压越低（反比）
+      // 暗光: ~3.3V -> 0%（无电流，负载电阻无压降）
+      // 室内: ~1.8V -> 45%
+      // 明亮: ~0V -> 100%（大电流，负载电阻压降大）
+      float pct = (1.0 - voltage / 3.3) * 100.0;
 
       // 输出调试信息
       ESP_LOGI("temt6000", "Voltage: %.3fV, Percentage: %.1f%%", voltage, pct);
@@ -131,28 +131,29 @@ sensor:
     icon: "mdi:brightness-5"
     lambda: |-
       float voltage = id(temt6000_voltage).state;
-      
-      // TEMT6000 输出特性曲线（假设使用 10kΩ 负载电阻）
+
+      // TEMT6000 共射极电路: 负载电阻压降 = 3.3 - Vcollector
       // 根据数据手册: Iout = 10 µA/lux
-      // V = I × R = 10 µA × 10kΩ = 0.1 V per 1000 lux
-      // 因此: lux = voltage × 10000
-      
+      // V_load = I × R = 10 µA × 10kΩ = 0.1 V per 1000 lux
+      // 因此: lux = (3.3 - voltage) × 10000
+      float v_load = 3.3 - voltage;
+
       // 实际校准公式（可根据实际测量调整）
       float lux;
-      if (voltage < 0.01) {
-        // 极暗（< 0.01V）
+      if (v_load < 0.01) {
+        // 极暗（< 0.01V 压降）
         lux = 0;
-      } else if (voltage < 1.0) {
+      } else if (v_load < 1.0) {
         // 0.01-1V: 0-500 lx (暗光到室内)
-        lux = voltage * 500;
-      } else if (voltage < 2.0) {
+        lux = v_load * 500;
+      } else if (v_load < 2.0) {
         // 1-2V: 500-2000 lx (室内到明亮)
-        lux = 500 + (voltage - 1.0) * 1500;
+        lux = 500 + (v_load - 1.0) * 1500;
       } else {
         // 2-3.3V: 2000-10000 lx (明亮到极亮)
-        lux = 2000 + (voltage - 2.0) * 6000;
+        lux = 2000 + (v_load - 2.0) * 6000;
       }
-      
+
       return lux;
     update_interval: 1s
 
@@ -165,10 +166,10 @@ sensor:
     icon: "mdi:current-dc"
     lambda: |-
       float voltage = id(temt6000_voltage).state;
-      // 假设负载电阻为 10kΩ
-      // I = V / R = V / 10000 (单位: A)
+      // 共射极电路: 负载电阻电流 I = (3.3 - Vcollector) / R_load
+      // I = (3.3 - V) / 10000 (单位: A)
       // 转换为 µA: × 1000000
-      float current_ua = (voltage / 10000.0) * 1000000.0;
+      float current_ua = ((3.3 - voltage) / 10000.0) * 1000000.0;
       return current_ua;
     update_interval: 1s
 
