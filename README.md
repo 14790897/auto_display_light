@@ -293,6 +293,10 @@ auto_display_light/
 ├── build.ps1              # 打包脚本
 ├── requirements.txt       # Python 依赖
 ├── README.md              # 本文档
+├── hardware/              # 集成版 PCB 硬件设计（Gerber + EDA 工程）
+│   ├── gerber/            # PCB 制造文件（直接发板厂）
+│   ├── project/           # 嘉立创 EDA 工程源文件
+│   └── HARDWARE_README.md # 硬件设计说明
 └── dist/                  # 打包输出
     └── AutoDisplayLight.exe
 ```
@@ -538,6 +542,10 @@ ESP32-C3 3.3V  → TEMT6000 VCC (V)
 ESP32-C3 GND   → TEMT6000 GND (G)
 ESP32-C3 GPIO3 ← TEMT6000 OUT (S)
 ```
+
+### 集成版 PCB（可选）
+
+如果你不想用杜邦线外接传感器模块，可以使用本仓库的集成版 PCB 设计——将 TEMT6000 直接集成到 ESP32-C3 最小系统板上。完整设计文件、焊接工艺、调试过程详见 [hardware/HARDWARE_README.md](hardware/HARDWARE_README.md)。
 
 ---
 
