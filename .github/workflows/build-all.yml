@@ -16,7 +16,7 @@ jobs:
     name: Build Firmware
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v5
         with:
@@ -36,16 +36,18 @@ jobs:
         env:
           PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: firmware
-          path: .esphome/build/temt6000-sensor/.pioenvs/temt6000-sensor/firmware*.bin
+          path: |
+            .esphome/build/temt6000-sensor/build/firmware.factory.bin
+            .esphome/build/temt6000-sensor/build/firmware.ota.bin
 
   build-exe:
     name: Build Exe
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v5
         with:
@@ -57,7 +59,7 @@ jobs:
       - name: Build exe
         run: pyinstaller autolight.spec
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: exe
           path: dist/AutoDisplayLight.exe
@@ -67,9 +69,9 @@ jobs:
     needs: [build-firmware, build-exe]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: artifacts
 
