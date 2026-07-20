@@ -1,5 +1,5 @@
 esphome:
-  name: temt6000-sensor
+  name: temt6000-integrated
   platformio_options:
     board_build.flash_mode: dio
   on_boot:

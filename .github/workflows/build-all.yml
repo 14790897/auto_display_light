@@ -43,6 +43,42 @@ jobs:
             .esphome/build/temt6000-sensor/build/firmware.factory.bin
             .esphome/build/temt6000-sensor/build/firmware.ota.bin
 
+  build-firmware-integrated:
+    name: Build Firmware (Integrated PCB)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ESPHome
+        run: pip install esphome
+
+      - name: Create secrets.yaml
+        run: |
+          echo 'wifi_ssid: "AutoDisplayLight"' > secrets.yaml
+          echo 'wifi_password: "12345678ABCD"' >> secrets.yaml
+
+      - name: Compile integrated firmware
+        run: esphome compile temt-on-esp32c3.yaml
+        env:
+          PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
+
+      - name: Rename firmware files
+        run: |
+          cd .esphome/build/temt6000-integrated/build/
+          mv firmware.factory.bin firmware-integrated.factory.bin
+          mv firmware.ota.bin firmware-integrated.ota.bin
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: firmware-integrated
+          path: |
+            .esphome/build/temt6000-integrated/build/firmware-integrated.factory.bin
+            .esphome/build/temt6000-integrated/build/firmware-integrated.ota.bin
+
   build-exe:
     name: Build Exe
     runs-on: windows-latest
@@ -66,7 +102,7 @@ jobs:
 
   release:
     name: Release
-    needs: [build-firmware, build-exe]
+    needs: [build-firmware, build-firmware-integrated, build-exe]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -87,5 +123,9 @@ jobs:
           gh release create "v$VERSION" \
             --repo ${{ github.repository }} \
             --title "AutoDisplayLight v$VERSION" \
-            --notes "AutoDisplayLight Release $VERSION" \
-            artifacts/firmware/* artifacts/exe/*
+            --notes "AutoDisplayLight Release $VERSION
+
+- firmware.factory.bin / firmware.ota.bin: 模块版固件 (esp32c3.yaml, Arduino, TEMT6000 模块+杜邦线)
+- firmware-integrated.factory.bin / firmware-integrated.ota.bin: 集成版固件 (temt-on-esp32c3.yaml, ESP-IDF, 自制集成 PCB)
+- AutoDisplayLight.exe: Windows 托盘客户端" \
+            artifacts/firmware/* artifacts/firmware-integrated/* artifacts/exe/*

@@ -136,9 +136,18 @@ pip install -r requirements.txt
 
 ## 🛠️ ESPHome 传感器配置
 
-### esp32c3.yaml 文件说明
+### 固件配置文件说明
 
-仓库中包含完整的 ESPHome 配置文件 `esp32c3.yaml`，支持以下功能：
+仓库提供**两套固件配置**，对应两种硬件方案，请根据你的硬件选择：
+
+| 配置文件 | 框架 | 适用硬件 | 电路特性 | 光照转换 | 设备名 |
+|----------|------|----------|----------|----------|--------|
+| `esp32c3.yaml` | Arduino | TEMT6000 模块 + 杜邦线 | 模块自带放大，电压正比 | `pct = V/3.3*100` | temt6000-sensor |
+| `temt-on-esp32c3.yaml` | ESP-IDF | 自制集成 PCB（见 [hardware/](hardware/HARDWARE_README.md)） | 共射极电路，电压反比 | `pct = (1-V/3.3)*100` | temt6000-integrated |
+
+> ⚠️ **不要混用**：两套固件的光照转换公式相反，刷错会导致"光越强读数越低"。模块版（正比）和集成版（反比）的 TEMT6000 接线方式不同，详见各 yaml 文件头部注释。
+
+两个配置共享以下功能：
 
 - **TEMT6000 光照传感器** - 模拟信号读取（ADC）
 - **WiFi Portal** - 自动配网门户
@@ -147,11 +156,18 @@ pip install -r requirements.txt
 - **OTA 更新** - 无线固件升级
 - **UDP 广播** - 局域网实时数据推送（可选）
 
+集成版（`temt-on-esp32c3.yaml`）额外包含：
+- **GPIO12/13 板载 LED 控制** - 启动时关闭以省电（airm2m 板 DIO flash 模式下这两个引脚可安全用作 GPIO）
+- **WiFi 发射功率限制** - 此板 C3 功率过高会死机，限制为 13.0
+- **USB-Serial/JTAG 日志输出** - ESP-IDF 框架下的日志通道
+
 ### 配置文件位置
 
 ```
 auto_display_light/
-└── esp32c3.yaml    # ESPHome 配置文件
+├── esp32c3.yaml              # 模块版固件配置 (Arduino)
+├── temt-on-esp32c3.yaml      # 集成版固件配置 (ESP-IDF)
+└── hardware/                 # 集成版 PCB 硬件文件 (Gerber + 工程)
 ```
 
 ### 主要配置项说明
@@ -340,11 +356,17 @@ MIT License
 
 ### 固件文件说明
 
-| 文件名                   | 大小           | 用途                            | 上传方式     |
-| ------------------------ | -------------- | ------------------------------- | ------------ |
-| **firmware.factory.bin** | ~981 KB        | ✅ **完整固件（推荐首次烧录）** | USB 串口     |
-| firmware.bin             | ~916 KB        | 应用程序                        | OTA          |
-| firmware.ota.bin         | ~916 KB        | OTA 更新专用                    | OTA          |
+CI 会构建两套固件，Release 页面提供以下文件：
+
+| 文件名 | 大小 | 适用硬件 | 用途 | 上传方式 |
+|--------|------|----------|------|----------|
+| **firmware.factory.bin** | ~1.0 MB | 模块版（杜邦线） | ✅ 完整固件（推荐首次烧录） | USB 串口 |
+| firmware.ota.bin | ~944 KB | 模块版（杜邦线） | OTA 更新专用 | OTA |
+| **firmware-integrated.factory.bin** | ~1.0 MB | 集成版 PCB | ✅ 完整固件（推荐首次烧录） | USB 串口 |
+| firmware-integrated.ota.bin | ~944 KB | 集成版 PCB | OTA 更新专用 | OTA |
+| AutoDisplayLight.exe | ~22.4 MB | Windows 客户端 | 屏幕亮度自动调节工具 | 直接运行 |
+
+> 选哪个？用 TEMT6000 模块 + 杜邦线接 ESP32-C3 → 选 `firmware.*`；用自己焊的集成版 PCB（[hardware/](hardware/HARDWARE_README.md)）→ 选 `firmware-integrated.*`。
 
 ---
 
