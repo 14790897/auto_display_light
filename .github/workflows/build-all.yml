@@ -123,9 +123,5 @@ jobs:
           gh release create "v$VERSION" \
             --repo ${{ github.repository }} \
             --title "AutoDisplayLight v$VERSION" \
-            --notes "AutoDisplayLight Release $VERSION
-
-- firmware.factory.bin / firmware.ota.bin: 模块版固件 (esp32c3.yaml, Arduino, TEMT6000 模块+杜邦线)
-- firmware-integrated.factory.bin / firmware-integrated.ota.bin: 集成版固件 (temt-on-esp32c3.yaml, ESP-IDF, 自制集成 PCB)
-- AutoDisplayLight.exe: Windows 托盘客户端" \
+            --notes "AutoDisplayLight Release $VERSION. 产物: firmware.* = 模块版固件 (esp32c3.yaml, Arduino, TEMT6000 模块+杜邦线); firmware-integrated.* = 集成版固件 (temt-on-esp32c3.yaml, ESP-IDF, 自制集成 PCB); AutoDisplayLight.exe = Windows 托盘客户端" \
             artifacts/firmware/* artifacts/firmware-integrated/* artifacts/exe/*
