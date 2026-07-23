@@ -1,5 +1,6 @@
 import json
 import os
+import queue
 import subprocess
 import sys
 import threading
@@ -241,9 +242,23 @@ class BrightnessController:
                 val = float(data['value'])
                 self.current_sensor_value = val
                 return val
+        except requests.exceptions.ConnectionError:
+            host = (
+                self.config["sensor_url"]
+                .replace("http://", "")
+                .replace("https://", "")
+                .split("/")[0]
+            )
+            self.update_status(f"传感器连接失败: 无法连接到 {host}")
+            self.update_status("请检查: 1.传感器是否在线 2.网络是否正常")
+        except requests.exceptions.Timeout:
+            self.update_status("传感器连接超时: 请求超过3秒未响应")
+        except requests.exceptions.HTTPError as e:
+            self.update_status(f"传感器HTTP错误: {e.response.status_code}")
+        except ValueError:
+            self.update_status("传感器数据格式错误: 无法解析JSON")
         except Exception as e:
             self.update_status(f"传感器错误: {str(e)[:50]}")
-            return None
         return None
     
     def set_screen_brightness(self, level, smooth=None):
@@ -365,20 +380,19 @@ class SettingsWindow:
         self.on_save = on_save
         
         self.create_widgets()
-        
+
         # 居中显示
-        self.center_window()
-        self.window.transient(parent)
-        self.window.grab_set()
-    
-    def center_window(self):
-        """窗口居中"""
         self.window.update_idletasks()
         width = self.window.winfo_width()
         height = self.window.winfo_height()
         x = (self.window.winfo_screenwidth() // 2) - (width // 2)
         y = (self.window.winfo_screenheight() // 2) - (height // 2)
         self.window.geometry(f'{width}x{height}+{x}+{y}')
+
+        self.window.transient(parent)
+        self.window.wait_visibility()
+        self.window.grab_set()
+        self.window.focus_set()
     
     def create_widgets(self):
         """创建界面组件"""
@@ -594,33 +608,39 @@ class MainWindow:
         self.root.title("自动屏幕亮度调节")
         self.root.geometry("500x350")
         self.root.resizable(False, False)
-        
+
+        # 消息队列（线程安全）
+        self.msg_queue = queue.Queue()
+
         # 加载配置
         self.config = ConfigManager.load()
-        
+
         # 创建控制器
         self.controller = BrightnessController(self.config)
         self.controller.set_status_callback(self.update_status)
-        
+
         # 托盘图标
         self.tray_icon = None
         self.is_hidden = False
-        
+
         self.create_widgets()
-        
+
         # 窗口关闭事件 - 最小化到托盘而不是退出
         self.root.protocol("WM_DELETE_WINDOW", self.hide_window)
-        
+
         # 如果配置启用，自动启动
         if self.config.get('enabled', True):
             self.start_service()
-        
+
         # 创建托盘图标
         self.create_tray_icon()
-        
+
         # 如果设置了启动时最小化
         if self.config.get('start_minimized', True):
             self.root.after(100, self.hide_window)
+
+        # 启动主线程消息处理
+        self.process_queue()
     
     def create_tray_icon(self):
         """创建系统托盘图标"""
@@ -722,16 +742,33 @@ class MainWindow:
         self.update_info_display()
     
     def update_status(self, message):
-        """更新状态显示"""
-        self.status_label.config(text=message)
-        # 更新托盘图标提示
-        if self.tray_icon:
-            status = "运行中" if self.controller.running else "已停止"
-            self.tray_icon.title = f"自动屏幕亮度调节 - {status}\n{message}"
+        """更新状态显示（线程安全 - 通过消息队列）"""
+        self.msg_queue.put(('status', message))
+
+    def process_queue(self):
+        """在主线程中处理消息队列"""
+        try:
+            while True:
+                msg_type, data = self.msg_queue.get_nowait()
+                if msg_type == 'status':
+                    self.status_label.config(text=data)
+                    self.update_info_display()
+                    if self.tray_icon:
+                        status = "运行中" if self.controller.running else "已停止"
+                        self.tray_icon.title = f"自动屏幕亮度调节 - {status}\n{data}"
+        except queue.Empty:
+            pass
+        self.root.after(100, self.process_queue)
     
     def update_info_display(self):
         """更新配置信息显示"""
+        sensor_val = self.controller.current_sensor_value
+        screen_val = self.controller.current_screen_value
+        sensor_str = f"{sensor_val:.1f}%" if sensor_val is not None else "---"
+        screen_str = f"{screen_val}%" if screen_val is not None else "---"
+
         info = f"""传感器: {self.config['sensor_url']}
+当前传感器: {sensor_str}  →  屏幕亮度: {screen_str}
 刷新间隔: {self.config['interval']} 秒
 亮度范围: {self.config['min_brightness']}% - {self.config['max_brightness']}%
 灵敏度: {self.config['threshold']}%"""
@@ -770,8 +807,9 @@ class MainWindow:
                 self.update_info_display()
                 return True
             return False
-        
-        SettingsWindow(self.root, self.config, on_save)
+
+        settings = SettingsWindow(self.root, self.config, on_save)
+        self.root.wait_window(settings.window)
     
     def open_settings_from_tray(self):
         """从托盘打开设置"""
