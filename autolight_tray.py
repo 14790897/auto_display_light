@@ -373,26 +373,16 @@ class SettingsWindow:
     def __init__(self, parent, config, on_save):
         self.window = tk.Toplevel(parent)
         self.window.title("自动亮度设置")
-        self.window.geometry("600x750")
         self.window.resizable(False, False)
-        
+
         self.config = config.copy()
         self.on_save = on_save
-        
+
         self.create_widgets()
 
-        # 居中显示
-        self.window.update_idletasks()
-        width = self.window.winfo_width()
-        height = self.window.winfo_height()
-        x = (self.window.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.window.winfo_screenheight() // 2) - (height // 2)
-        self.window.geometry(f'{width}x{height}+{x}+{y}')
-
         self.window.transient(parent)
-        self.window.wait_visibility()
-        self.window.grab_set()
-        self.window.focus_set()
+        self.window.geometry("+{}+{}".format(
+            parent.winfo_rootx() + 50, parent.winfo_rooty() + 30))
     
     def create_widgets(self):
         """创建界面组件"""
@@ -478,34 +468,36 @@ class SettingsWindow:
         # 开机自启动
         autostart_frame = ttk.LabelFrame(main_frame, text="开机自启动", padding="10")
         autostart_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        # 显示当前状态
-        self.autostart_status_var = tk.StringVar()
-        self.update_autostart_status()
+
+        # 显示当前状态（异步检测，避免阻塞窗口打开）
+        self.autostart_status_var = tk.StringVar(value="检测中...")
         status_label = ttk.Label(autostart_frame, textvariable=self.autostart_status_var)
         status_label.pack(anchor=tk.W, pady=(0, 5))
-        
+
         # 开关按钮
         autostart_btn_frame = ttk.Frame(autostart_frame)
         autostart_btn_frame.pack(fill=tk.X)
-        
+
         self.enable_autostart_btn = ttk.Button(
-            autostart_btn_frame, 
-            text="启用开机自启动", 
+            autostart_btn_frame,
+            text="启用开机自启动",
             command=self.enable_autostart,
-            width=20
+            width=20,
+            state=tk.DISABLED
         )
         self.enable_autostart_btn.pack(side=tk.LEFT, padx=(0, 5))
-        
+
         self.disable_autostart_btn = ttk.Button(
             autostart_btn_frame,
             text="禁用开机自启动",
             command=self.disable_autostart,
-            width=20
+            width=20,
+            state=tk.DISABLED
         )
         self.disable_autostart_btn.pack(side=tk.LEFT)
-        
-        self.update_autostart_buttons()
+
+        # 异步检测开机自启动状态
+        threading.Thread(target=self._check_autostart, daemon=True).start()
         
         # 按钮
         button_frame = ttk.Frame(main_frame)
@@ -549,12 +541,23 @@ class SettingsWindow:
     def update_autostart_buttons(self):
         """更新开机自启动按钮状态"""
         is_enabled = AutostartManager.is_enabled()
+        self.window.after(0, lambda: self._set_autostart_ui(is_enabled))
+
+    def _set_autostart_ui(self, is_enabled):
+        """在主线程更新开机自启动UI"""
         if is_enabled:
+            self.autostart_status_var.set("✅ 已启用开机自启动")
             self.enable_autostart_btn.config(state=tk.DISABLED)
             self.disable_autostart_btn.config(state=tk.NORMAL)
         else:
+            self.autostart_status_var.set("❌ 未启用开机自启动")
             self.enable_autostart_btn.config(state=tk.NORMAL)
             self.disable_autostart_btn.config(state=tk.DISABLED)
+
+    def _check_autostart(self):
+        """后台线程检测开机自启动状态"""
+        is_enabled = AutostartManager.is_enabled()
+        self.window.after(0, lambda: self._set_autostart_ui(is_enabled))
     
     def enable_autostart(self):
         """启用开机自启动"""
@@ -808,8 +811,7 @@ class MainWindow:
                 return True
             return False
 
-        settings = SettingsWindow(self.root, self.config, on_save)
-        self.root.wait_window(settings.window)
+        SettingsWindow(self.root, self.config, on_save)
     
     def open_settings_from_tray(self):
         """从托盘打开设置"""

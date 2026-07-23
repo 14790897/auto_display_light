@@ -56,7 +56,7 @@ cd auto_display_light
 pip install -r requirements.txt
 
 # 运行程序
-python autolight.py
+python autolight_tray.py
 ```
 
 ### 打包成 EXE
