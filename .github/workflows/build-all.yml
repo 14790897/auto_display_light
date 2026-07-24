@@ -79,6 +79,42 @@ jobs:
             .esphome/build/temt6000-integrated/build/firmware-integrated.factory.bin
             .esphome/build/temt6000-integrated/build/firmware-integrated.ota.bin
 
+  build-firmware-c5:
+    name: Build Firmware (ESP32-C5)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ESPHome
+        run: pip install esphome
+
+      - name: Create secrets.yaml
+        run: |
+          echo 'wifi_ssid: "AutoDisplayLight"' > secrets.yaml
+          echo 'wifi_password: "12345678ABCD"' >> secrets.yaml
+
+      - name: Compile C5 firmware
+        run: esphome compile esp32c5.yaml
+        env:
+          PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
+
+      - name: Rename firmware files
+        run: |
+          cd .esphome/build/temt6000-sensor-c5/build/
+          mv firmware.factory.bin firmware-c5.factory.bin
+          mv firmware.ota.bin firmware-c5.ota.bin
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: firmware-c5
+          path: |
+            .esphome/build/temt6000-sensor-c5/build/firmware-c5.factory.bin
+            .esphome/build/temt6000-sensor-c5/build/firmware-c5.ota.bin
+
   build-exe:
     name: Build Exe
     runs-on: windows-latest
@@ -102,7 +138,7 @@ jobs:
 
   release:
     name: Release
-    needs: [build-firmware, build-firmware-integrated, build-exe]
+    needs: [build-firmware, build-firmware-integrated, build-firmware-c5, build-exe]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -123,5 +159,5 @@ jobs:
           gh release create "v$VERSION" \
             --repo ${{ github.repository }} \
             --title "AutoDisplayLight v$VERSION" \
-            --notes "AutoDisplayLight Release $VERSION. 产物: firmware.* = 模块版固件 (esp32c3.yaml, Arduino, TEMT6000 模块+杜邦线); firmware-integrated.* = 集成版固件 (temt-on-esp32c3.yaml, ESP-IDF, 自制集成 PCB); AutoDisplayLight.exe = Windows 托盘客户端" \
-            artifacts/firmware/* artifacts/firmware-integrated/* artifacts/exe/*
+            --notes "AutoDisplayLight Release $VERSION. 产物: firmware.* = 模块版固件 (esp32c3.yaml, Arduino, TEMT6000 模块+杜邦线); firmware-integrated.* = 集成版固件 (temt-on-esp32c3.yaml, ESP-IDF, 自制集成 PCB); firmware-c5.* = ESP32-C5 版固件 (esp32c5.yaml, ESP-IDF, Wi-Fi 6 双频); AutoDisplayLight.exe = Windows 托盘客户端" \
+            artifacts/firmware/* artifacts/firmware-integrated/* artifacts/firmware-c5/* artifacts/exe/*
