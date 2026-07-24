@@ -561,21 +561,31 @@ class SettingsWindow:
     
     def enable_autostart(self):
         """启用开机自启动"""
-        if AutostartManager.enable():
-            messagebox.showinfo("成功", "已启用开机自启动\n下次登录时程序将自动启动")
-            self.update_autostart_status()
-            self.update_autostart_buttons()
-        else:
-            messagebox.showerror("失败", "启用开机自启动失败\n请检查是否有足够的权限")
-    
+        def _toggle():
+            if AutostartManager.enable():
+                self.window.after(0, lambda: (
+                    self._set_autostart_ui(True),
+                    messagebox.showinfo("成功", "已启用开机自启动\n下次登录时程序将自动启动")
+                ))
+            else:
+                self.window.after(0, lambda: messagebox.showerror("失败", "启用开机自启动失败\n请检查是否有足够的权限"))
+        self.enable_autostart_btn.config(state=tk.DISABLED)
+        self.disable_autostart_btn.config(state=tk.DISABLED)
+        threading.Thread(target=_toggle, daemon=True).start()
+
     def disable_autostart(self):
         """禁用开机自启动"""
-        if AutostartManager.disable():
-            messagebox.showinfo("成功", "已禁用开机自启动")
-            self.update_autostart_status()
-            self.update_autostart_buttons()
-        else:
-            messagebox.showerror("失败", "禁用开机自启动失败")
+        def _toggle():
+            if AutostartManager.disable():
+                self.window.after(0, lambda: (
+                    self._set_autostart_ui(False),
+                    messagebox.showinfo("成功", "已禁用开机自启动")
+                ))
+            else:
+                self.window.after(0, lambda: messagebox.showerror("失败", "禁用开机自启动失败"))
+        self.enable_autostart_btn.config(state=tk.DISABLED)
+        self.disable_autostart_btn.config(state=tk.DISABLED)
+        threading.Thread(target=_toggle, daemon=True).start()
     
     def toggle_smooth_options(self):
         """切换平滑过渡选项的启用状态"""
