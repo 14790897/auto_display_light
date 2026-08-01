@@ -212,7 +212,7 @@ class ConfigManager:
 
 class BrightnessController:
     """亮度控制器"""
-    
+
     def __init__(self, config):
         self.config = config
         self.running = False
@@ -221,11 +221,13 @@ class BrightnessController:
         self.status_callback = None
         self.current_sensor_value = None
         self.current_screen_value = None
-        
+        self._consecutive_failures = 0
+        self._was_connected = False
+
     def set_status_callback(self, callback):
         """设置状态更新回调"""
         self.status_callback = callback
-    
+
     def update_status(self, message):
         """更新状态信息"""
         if self.status_callback:
@@ -237,10 +239,15 @@ class BrightnessController:
             response = requests.get(self.config['sensor_url'], timeout=3)
             response.raise_for_status()
             data = response.json()
-            
+
             if 'value' in data:
                 val = float(data['value'])
                 self.current_sensor_value = val
+                # 连接成功，重置失败计数
+                if not self._was_connected:
+                    self._was_connected = True
+                    self.update_status("传感器已连接")
+                self._consecutive_failures = 0
                 return val
         except requests.exceptions.ConnectionError:
             host = (
@@ -249,17 +256,37 @@ class BrightnessController:
                 .replace("https://", "")
                 .split("/")[0]
             )
-            self.update_status(f"传感器连接失败: 无法连接到 {host}")
-            self.update_status("请检查: 1.传感器是否在线 2.网络是否正常")
+            self._handle_connection_failure(f"无法连接到 {host}")
         except requests.exceptions.Timeout:
-            self.update_status("传感器连接超时: 请求超过3秒未响应")
+            self._handle_connection_failure("连接超时: 请求超过3秒未响应")
         except requests.exceptions.HTTPError as e:
-            self.update_status(f"传感器HTTP错误: {e.response.status_code}")
+            self._handle_connection_failure(f"HTTP错误: {e.response.status_code}")
         except ValueError:
-            self.update_status("传感器数据格式错误: 无法解析JSON")
+            self._handle_connection_failure("数据格式错误: 无法解析JSON")
         except Exception as e:
-            self.update_status(f"传感器错误: {str(e)[:50]}")
+            self._handle_connection_failure(f"传感器错误: {str(e)[:50]}")
         return None
+
+    def _handle_connection_failure(self, message):
+        """处理连接失败"""
+        self._consecutive_failures += 1
+
+        # 首次连接失败时显示详细提示
+        if self._consecutive_failures == 1:
+            self.update_status(f"传感器连接失败: {message}")
+            self.update_status("提示: 检查传感器是否在线，尝试重新连接...")
+
+            # 如果之前是连接状态，尝试触发网络刷新
+            if self._was_connected:
+                self.update_status("正在等待网络恢复...")
+        elif self._consecutive_failures == 5:
+            self.update_status("传感器持续无响应，尝试等待恢复...")
+        elif self._consecutive_failures >= 10 and self._consecutive_failures % 10 == 0:
+            self.update_status(f"传感器仍无响应 (已尝试 {self._consecutive_failures} 次)")
+
+        # 如果长时间失败（超过1分钟），标记需要重连
+        if self._consecutive_failures > 12:
+            self._was_connected = False
     
     def set_screen_brightness(self, level, smooth=None):
         """设置屏幕亮度"""
@@ -654,6 +681,54 @@ class MainWindow:
 
         # 启动主线程消息处理
         self.process_queue()
+
+        # 注册Windows电源事件监听（睡眠/唤醒检测）
+        self._register_power_event_handler()
+
+    def _register_power_event_handler(self):
+        """注册Windows电源事件监听，处理睡眠唤醒后的网络恢复"""
+        import ctypes
+        from ctypes import wintypes
+
+        # Windows消息常量
+        WM_POWERBROADCAST = 0x0218
+        PBT_APMRESUMEAUTOMATIC = 0x0012  # 系统从睡眠/休眠自动唤醒
+
+        try:
+            hwnd = self.root.winfo_id()
+
+            def power_event(message):
+                if message == PBT_APMRESUMEAUTOMATIC:
+                    # 系统从睡眠唤醒，触发重连
+                    self.root.after(500, self._on_system_resume)
+                return False
+
+            def wnd_proc(hwnd, msg, wparam, lparam):
+                if msg == WM_POWERBROADCAST:
+                    power_event(wparam)
+                return ctypes.windll.user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+
+            WNDPROC = ctypes.WINFUNCTYPE(ctypes.c_long, wintypes.HWND, ctypes.c_uint, ctypes.c_voidp, ctypes.c_voidp)
+            self._wnd_proc = WNDPROC(wnd_proc)
+
+            # 获取窗口过程并设置子类化
+            self._old_wnd_proc = ctypes.windll.user32.SetWindowLongPtrW(
+                hwnd, -4, self._wnd_proc)  # GWL_WNDPROC = -4
+
+            # 注册电源设置通知
+            ctypes.windll.user32.RegisterPowerSettingNotification(
+                hwnd, ctypes.byref(ctypes.c_voidp(0)), 0)
+
+        except Exception as e:
+            print(f"电源事件监听注册失败（不影响核心功能）: {e}")
+
+    def _on_system_resume(self):
+        """系统从睡眠唤醒后的处理"""
+        if self.controller.running:
+            # 重置连接状态，强制重新连接
+            self.controller._was_connected = False
+            self.controller._consecutive_failures = 0
+            self.update_status("系统唤醒: 正在重新连接传感器...")
     
     def create_tray_icon(self):
         """创建系统托盘图标"""
